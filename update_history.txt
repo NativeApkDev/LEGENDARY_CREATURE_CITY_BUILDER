@@ -1,7 +1,12 @@
-1. Version 1 (Estimated Release Date: late January 2022):
-- Allows online multiplayer battles
+1. Version 1 (Estimated Release Date: early February 2022):
+- Allows online multiplayer battles.
+- Allows the player to send gifts to other player.
+- Allows the player to chat with other players.
+- Allows the player to be friends with other players.
 - The players can build on their cities and grow legendary creatures.
 - The item shop sells eggs for all possible elements of legendary creatures.
 - The item shop sells runes of all ratings (i.e., 1 to 6).
 
 2. Version 2 (Release Date: TBA)
+- Players can join guilds.
+- "Guild Battle" feature to be added.

@@ -435,6 +435,8 @@ class Player:
         self.legendary_creature_inventory: LegendaryCreatureInventory = LegendaryCreatureInventory()
         self.player_city: PlayerCity = PlayerCity()
         self.__unlocked_levels: list = []  # initial value
+        self.__friends: list = []  # initial value
+        self.friend_points: int = 0  # initial value
 
     def __str__(self):
         # type: () -> str
@@ -453,6 +455,30 @@ class Player:
     def get_unlocked_levels(self):
         # type: () -> list
         return self.__unlocked_levels
+
+    def get_friends(self):
+        # type: () -> list
+        return self.__friends
+
+    def add_friend(self, friend):
+        # type: (Player) -> None
+        self.__friends.append(friend)
+
+    def remove_friend(self, friend):
+        # type: (Player) -> bool
+        if friend in self.__friends:
+            self.__friends.remove(friend)
+            return True
+        return False
+
+    def send_gift(self, friend):
+        # type: (Player) -> bool
+        if friend not in self.__friends:
+            return False
+
+        random_reward: Reward = Reward()  # TODO: generate random reward
+        self.friend_points += 10
+        # TODO: ensure 'friend' receives the reward
 
     def add_unlocked_level(self):
         # type: () -> None
@@ -477,11 +503,76 @@ class CPU(Player):
         self.next_available_time: datetime or None = None
         self.times_beaten: int = 0  # initial value
 
+
+class Conversation:
+    """
+    This class contains attribute of a chat conversation between one player and another.
+    """
+
+    def __init__(self, player1, player2):
+        # type: (Player, Player) -> None
+        self.player1: Player = player1
+        self.player2: Player = player2
+        self.__messages: list = []  # initial value
+
     def __str__(self):
-        return '%s(%s)' % (
-            type(self).__name__,
-            ', '.join('%s=%s' % item for item in vars(self).items())
-        )
+        # type: () -> str
+        res: str = str(type(self).__name__) + "("  # initial value
+        index: int = 0  # initial value
+        for item in vars(self).items():
+            res += str(item[0]) + "=" + str(item[1])
+
+            if index < len(vars(self).items()) - 1:
+                res += ", "
+
+            index += 1
+
+        return res + ")"
+
+    def get_messages(self):
+        # type: () -> list
+        return self.__messages
+
+    def add_message(self, message):
+        # type: (Message) -> bool
+        if message.sender not in [self.player1, self.player2]:
+            return False
+        self.__messages.append(message)
+        return True
+
+    def clone(self):
+        # type: () -> Conversation
+        return copy.deepcopy(self)
+
+
+class Message:
+    """
+    This class contains attributes of a message sent by a player in a conversation.
+    """
+
+    def __init__(self, sender, contents):
+        # type: (Player, str) -> None
+        self.time_sent: datetime = datetime.now()
+        self.sender: Player = sender
+        self.contents: str = contents
+
+    def __str__(self):
+        # type: () -> str
+        res: str = str(type(self).__name__) + "("  # initial value
+        index: int = 0  # initial value
+        for item in vars(self).items():
+            res += str(item[0]) + "=" + str(item[1])
+
+            if index < len(vars(self).items()) - 1:
+                res += ", "
+
+            index += 1
+
+        return res + ")"
+
+    def clone(self):
+        # type: () -> Message
+        return copy.deepcopy(self)
 
 
 class PlayerCity:
@@ -986,6 +1077,9 @@ class Reward:
     """
 
 
+########################################### VERSION 2 FEATURES (DRAFT CODE) ###########################################
+
+
 class Guild:
     """
     This class contains attributes of a guild where players can team-up for team battles in this game.
@@ -1036,6 +1130,38 @@ class Guild:
             index += 1
 
         return res + ")"
+
+
+class GuildBattle:
+    """
+    This class contains attributes of a battle between two guilds
+    """
+
+    def __init__(self, guild1, guild2):
+        # type: (Guild, Guild) -> None
+        self.guild1: Guild = guild1
+        self.guild2: Guild = guild2
+
+    def clone(self):
+        # type: () -> GuildBattle
+        return copy.deepcopy(self)
+
+    def __str__(self):
+        # type: () -> str
+        res: str = str(type(self).__name__) + "("  # initial value
+        index: int = 0  # initial value
+        for item in vars(self).items():
+            res += str(item[0]) + "=" + str(item[1])
+
+            if index < len(vars(self).items()) - 1:
+                res += ", "
+
+            index += 1
+
+        return res + ")"
+
+
+########################################### VERSION 2 FEATURES (DRAFT CODE) ###########################################
 
 
 class Game:
