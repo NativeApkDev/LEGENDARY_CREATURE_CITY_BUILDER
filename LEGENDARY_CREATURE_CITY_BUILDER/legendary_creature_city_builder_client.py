@@ -18,10 +18,9 @@ import uuid
 import pickle
 import copy
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from functools import reduce
-import socket
 from minigames import *
 
 from mpmath import mp, mpf
@@ -33,8 +32,6 @@ mp.pretty = True
 
 
 LETTERS: str = "abcdefghijklmnopqrstuvwxyz"
-HOST: str  # IP address of the host
-PORT: int  # port number
 ELEMENT_CHART: list = [
     ["ATTACKING\nELEMENT", "TERRA", "FLAME", "SEA", "NATURE", "ELECTRIC", "ICE", "METAL", "DARK", "LIGHT", "WAR",
      "PURE",
@@ -71,6 +68,167 @@ def generate_random_name() -> str:
         res += LETTERS[random.randint(0, len(LETTERS) - 1)]
 
     return res.capitalize()
+
+
+def generate_random_legendary_creature(element):
+    # type: (str) -> LegendaryCreature
+    name: str = generate_random_name()
+    main_element: str = element
+    rating: int = LegendaryCreature.MIN_RATING
+    max_hp: mpf = mpf(random.randint(45000, 55000))
+    max_magic_points: mpf = mpf(random.randint(45000, 55000))
+    attack_power: mpf = mpf(random.randint(8500, 9500))
+    defense: mpf = mpf(random.randint(8500, 9500))
+    attack_speed: mpf = mpf(random.randint(100, 125))
+    skills: list = [
+        ActiveSkill("SINGLE-TARGET ATTACK SKILL #1", "Normal Single-Target Attack Skill", "ATTACK", False,
+                    mpf("1e2") * random.randint(8, 14),
+                    2, DamageMultiplier(
+                random.randint(1, 3) * mpf("0.01"),
+                random.randint(1, 3) * mpf("0.01"),
+                mpf(3 + random.random() * 2),
+                mpf(random.random()),
+                mpf(3 + random.random() * 2),
+                mpf(random.random()),
+                random.randint(1, 3) * mpf("0.01"),
+                random.randint(1, 3) * mpf("0.01"),
+                mpf("0.5"),
+                mpf("0.25"),
+                mpf("0.05"),
+                mpf("0.05"),
+                mpf("0.05")
+            ), [], [], mpf("0"), mpf("0"), mpf("0"), random.random() < 0.1, random.random() < 0.1,
+                    random.random() < 0.1),
+        ActiveSkill("SINGLE-TARGET ATTACK SKILL #2", "Strong Single-Target Attack Skill", "ATTACK", False,
+                    mpf("1e9") * random.randint(8, 14),
+                    4, DamageMultiplier(
+                random.randint(1, 3) * mpf("0.03"),
+                random.randint(1, 3) * mpf("0.03"),
+                mpf(9 + random.random() * 6),
+                mpf(2 * random.random()),
+                mpf(9 + random.random() * 6),
+                mpf(2 * random.random()),
+                random.randint(1, 3) * mpf("0.03"),
+                random.randint(1, 3) * mpf("0.03"),
+                mpf("1.5"),
+                mpf("0.75"),
+                mpf("0.1"),
+                mpf("0.1"),
+                mpf("0.1")
+            ), [BeneficialEffect(
+                BeneficialEffect.POSSIBLE_NAMES[random.randint(0, len(BeneficialEffect.POSSIBLE_NAMES) - 1)], 2
+            )], [HarmfulEffect(
+                HarmfulEffect.POSSIBLE_NAMES[random.randint(0, len(HarmfulEffect.POSSIBLE_NAMES) - 1)], 2
+            )], mpf("0.1"), mpf("0.1"), mpf("0"), random.random() < 0.3, random.random() < 0.3,
+                    random.random() < 0.3),
+        ActiveSkill("SINGLE-TARGET ATTACK SKILL #3", "Ultimate Single-Target Attack Skill", "ATTACK", False,
+                    mpf("1e29") * random.randint(8, 14),
+                    8, DamageMultiplier(
+                random.randint(1, 3) * mpf("0.06"),
+                random.randint(1, 3) * mpf("0.06"),
+                mpf(27 + random.random() * 10),
+                mpf(6 * random.random()),
+                mpf(27 + random.random() * 10),
+                mpf(6 * random.random()),
+                random.randint(1, 3) * mpf("0.06"),
+                random.randint(1, 3) * mpf("0.06"),
+                mpf("4.5"),
+                mpf("2.25"),
+                mpf("0.3"),
+                mpf("0.3"),
+                mpf("0.3")
+            ), [BeneficialEffect(
+                BeneficialEffect.POSSIBLE_NAMES[random.randint(0, len(BeneficialEffect.POSSIBLE_NAMES) - 1)], 2
+            )], [HarmfulEffect(
+                HarmfulEffect.POSSIBLE_NAMES[random.randint(0, len(HarmfulEffect.POSSIBLE_NAMES) - 1)], 2
+            )], mpf("0.25"), mpf("0.25"), mpf("0"), random.random() < 0.5, random.random() < 0.5,
+                    random.random() < 0.5),
+        ActiveSkill("MULTI-TARGET ATTACK SKILL #1", "Normal Multi-Target Attack Skill", "ATTACK", True,
+                    mpf("1e2") * random.randint(8, 14),
+                    2, DamageMultiplier(
+                multiplier_to_self_attack_power=mpf("0.5") + mpf("0.1") * random.randint(2, 5)
+            ), [], [], mpf("0"), mpf("0"), mpf("0"), random.random() < 0.1, random.random() < 0.1,
+                    random.random() < 0.1),
+        ActiveSkill("MULTI-TARGET ATTACK SKILL #2", "Strong Multi-Target Attack Skill", "ATTACK", True,
+                    mpf("1e9") * random.randint(8, 14),
+                    2, DamageMultiplier(
+                multiplier_to_self_attack_power=mpf("2") + mpf("0.1") * random.randint(2, 5)
+            ), [BeneficialEffect(
+                BeneficialEffect.POSSIBLE_NAMES[random.randint(0, len(BeneficialEffect.POSSIBLE_NAMES) - 1)], 2
+            )], [HarmfulEffect(
+                HarmfulEffect.POSSIBLE_NAMES[random.randint(0, len(HarmfulEffect.POSSIBLE_NAMES) - 1)], 2
+            )], mpf("0.05"), mpf("0.05"), mpf("0"), random.random() < 0.3, random.random() < 0.3,
+                    random.random() < 0.3),
+        ActiveSkill("MULTI-TARGET ATTACK SKILL #3", "Ultimate Multi-Target Attack Skill", "ATTACK", True,
+                    mpf("1e29") * random.randint(8, 14),
+                    2, DamageMultiplier(
+                multiplier_to_self_attack_power=mpf("6.1") + mpf("0.1") * random.randint(2, 5),
+                multiplier_to_enemy_max_hp=mpf("0.03") * random.randint(1, 3)
+            ), [BeneficialEffect(
+                BeneficialEffect.POSSIBLE_NAMES[random.randint(0, len(BeneficialEffect.POSSIBLE_NAMES) - 1)], 2
+            )], [HarmfulEffect(
+                HarmfulEffect.POSSIBLE_NAMES[random.randint(0, len(HarmfulEffect.POSSIBLE_NAMES) - 1)], 2
+            )], mpf("0.15"), mpf("0.15"), mpf("0"), random.random() < 0.5, random.random() < 0.5,
+                    random.random() < 0.5),
+        ActiveSkill("HEAL SKILL #1", "First Heal Skill", "HEAL", True,
+                    mpf("1e2") * random.randint(8, 14),
+                    2, DamageMultiplier(), [], [],
+                    mpf("0"), mpf("0"),
+                    mpf("1e2") * random.randint(18, 24),
+                    False, False, False),
+        ActiveSkill("HEAL SKILL #2", "Better Heal Skill", "HEAL", True,
+                    mpf("1e9") * random.randint(8, 14),
+                    4, DamageMultiplier(), [], [],
+                    mpf("0"), mpf("0"),
+                    mpf("1e11") * random.randint(18, 24),
+                    False, False, False),
+        ActiveSkill("HEAL SKILL #3", "Ultimate Heal Skill", "HEAL", True,
+                    mpf("1e29") * random.randint(8, 14),
+                    8, DamageMultiplier(), [], [],
+                    mpf("0"), mpf("0"),
+                    mpf("1e35") * random.randint(18, 24),
+                    False, False, False),
+        PassiveSkill("EXTRA TURN PASSIVE SKILL", "Increase player's extra turn change by 15%.",
+                     PassiveSkillEffect(extra_turn_chance_up=mpf("0.15"))),
+        LeaderSkill("ATTACK LEADER SKILL", "Increase all allies' attack power by 20%.", mpf("0"),
+                    LeaderSkillEffect(attack_power_percentage_up=mpf("20")))
+    ]
+
+    new_skill_gained: ActiveSkill = ActiveSkill("SINGLE-TARGET ATTACK SKILL #4", "Extreme Single-Target Attack Skill",
+                                                "ATTACK", False,
+                                                mpf("1e89") * random.randint(8, 14),
+                                                8, DamageMultiplier(
+            random.randint(1, 3) * mpf("0.15"),
+            random.randint(1, 3) * mpf("0.15"),
+            mpf(90 + random.random() * 15),
+            mpf(15 * random.random()),
+            mpf(90 + random.random() * 15),
+            mpf(15 * random.random()),
+            random.randint(1, 3) * mpf("0.15"),
+            random.randint(1, 3) * mpf("0.15"),
+            mpf("13.5"),
+            mpf("6.75"),
+            mpf("0.9"),
+            mpf("0.9"),
+            mpf("0.9")
+        ), [BeneficialEffect(
+            BeneficialEffect.POSSIBLE_NAMES[random.randint(0, len(BeneficialEffect.POSSIBLE_NAMES) - 1)], 2
+        )], [HarmfulEffect(
+            HarmfulEffect.POSSIBLE_NAMES[random.randint(0, len(HarmfulEffect.POSSIBLE_NAMES) - 1)], 2
+        )], mpf("0.5"), mpf("0.5"), mpf("0"), random.random() < 0.9, random.random() < 0.9,
+                                                random.random() < 0.9)
+
+    awaken_bonus: AwakenBonus = AwakenBonus(mpf(random.randint(115, 135)), mpf(random.randint(115, 135)),
+                                            mpf(random.randint(115, 135)), mpf(random.randint(115, 135)),
+                                            mpf(random.randint(0, 15)),
+                                            mpf(0.01 * random.randint(0, 15)), mpf(0.01 * random.randint(0, 15)),
+                                            mpf(0.01 * random.randint(0, 15)), mpf(0.01 * random.randint(0, 15)),
+                                            new_skill_gained
+                                            )
+    new_legendary_creature: LegendaryCreature = LegendaryCreature(name, main_element, rating, max_hp, max_magic_points,
+                                                                  attack_power, defense, attack_speed, skills,
+                                                                  awaken_bonus)
+    return new_legendary_creature
 
 
 def triangular(n: int) -> int:
@@ -777,6 +935,51 @@ class Player:
 
         return res + ")"
 
+    def place_egg_in_hatchery(self, egg, hatchery):
+        # type: (Egg, Hatchery) -> bool
+        if egg not in self.item_inventory.get_items():
+            return False
+
+        hatchery_exists: bool = False
+        for section in self.player_city.get_sections():
+            for y in range(section.SECTION_HEIGHT):
+                for x in range(section.SECTION_WIDTH):
+                    curr_tile: CityTile = section.get_tile_at(x, y)
+                    if curr_tile.building == hatchery:
+                        hatchery_exists = True
+                        break
+
+        if not hatchery_exists:
+            return False
+
+        if hatchery.add_egg(egg):
+            egg.hatch_time = datetime.now() + timedelta(minutes=10)
+            return True
+        return False
+
+    def hatch_eggs_in_hatcheries(self):
+        # type: () -> None
+        """
+        This function automatically hatches all eggs in the hatcheries
+        :return: None
+        """
+        hatcheries: list = []  # initial value
+        for section in self.player_city.get_sections():
+            for y in range(section.SECTION_HEIGHT):
+                for x in range(section.SECTION_WIDTH):
+                    curr_tile: CityTile = section.get_tile_at(x, y)
+                    if isinstance(curr_tile.building, Hatchery):
+                        hatcheries.append(curr_tile.building)
+
+        for hatchery in hatcheries:
+            assert isinstance(hatchery, Hatchery), "Not a hatchery! Invalid instance in 'hatcheries' list!"
+            for egg in hatchery.get_eggs_placed():
+                if egg.hatch_time is not None:
+                    if datetime.now() >= egg.hatch_time:
+                        # Initialise a random legendary creature
+                        new_legendary_creature: LegendaryCreature = generate_random_legendary_creature(egg.element)
+                        self.add_legendary_creature(new_legendary_creature)
+
     def claim_reward(self, reward):
         # type: (Reward) -> None
         self.exp += reward.player_reward_exp
@@ -790,6 +993,18 @@ class Player:
         self.battle_team.recover_all()
         for item in reward.get_player_reward_items():
             self.add_item_to_inventory(item)
+
+    def feed_legendary_creature(self, legendary_creature, food):
+        # type: (LegendaryCreature, mpf) -> bool
+        if legendary_creature not in self.legendary_creature_inventory.get_legendary_creatures():
+            return False
+
+        if food > self.food:
+            return False
+
+        legendary_creature.exp += food
+        legendary_creature.level_up()
+        return True
 
     def make_a_wish(self, temple_of_wishes):
         # type: (TempleOfWishes) -> bool
@@ -814,16 +1029,7 @@ class Player:
         if isinstance(object_obtained, Item):
             self.add_item_to_inventory(object_obtained)
         elif isinstance(object_obtained, Reward):
-            self.exp += object_obtained.player_reward_exp
-            self.level_up()
-            self.gold += object_obtained.player_reward_gold
-            self.gems += object_obtained.player_reward_gems
-            for legendary_creature in self.legendary_creature_inventory.get_legendary_creatures():
-                legendary_creature.exp += object_obtained.legendary_creature_reward_exp
-                legendary_creature.level_up()
-
-            for item in object_obtained.get_player_reward_items():
-                self.add_item_to_inventory(item)
+            self.claim_reward(object_obtained)
         elif isinstance(object_obtained, LegendaryCreature):
             self.add_legendary_creature(object_obtained)
         else:
@@ -835,6 +1041,10 @@ class Player:
         # type: (LegendaryCreature, LegendaryCreature, FusionCenter) -> bool
         if legendary_creature1 not in self.legendary_creature_inventory.get_legendary_creatures() or \
                 legendary_creature2 not in self.legendary_creature_inventory.get_legendary_creatures():
+            return False
+
+        if legendary_creature1 in self.battle_team.get_legendary_creatures() or \
+                legendary_creature2 in self.battle_team.get_legendary_creatures():
             return False
 
         fusion_center_exists: bool = False
@@ -849,7 +1059,40 @@ class Player:
         if not fusion_center_exists:
             return False
 
-        # TODO: Fuse both legendary creatures into a new one
+        # Fuse both legendary creatures into a new one
+        name: str = generate_random_name()
+        main_element: str = legendary_creature1.get_elements()[0]
+        elements: list = [element for element in legendary_creature1.get_elements()] + \
+                         [element for element in legendary_creature2.get_elements()]
+        rating: int = 1
+        max_hp: mpf = legendary_creature1.max_hp + legendary_creature2.max_hp
+        max_magic_points: mpf = legendary_creature1.max_magic_points + legendary_creature2.max_magic_points
+        attack_power: mpf = legendary_creature1.attack_power + legendary_creature2.attack_power
+        defense: mpf = legendary_creature1.defense + legendary_creature2.defense
+        attack_speed: mpf = max(legendary_creature1.attack_speed, legendary_creature2.attack_speed)
+        skills: list = [skill for skill in legendary_creature1.get_skills()] + \
+                       [skill for skill in legendary_creature2.get_skills()]
+        awaken_bonus: AwakenBonus = legendary_creature1.awaken_bonus
+        new_legendary_creature: LegendaryCreature = LegendaryCreature(name, main_element, rating, max_hp,
+                                                                      max_magic_points, attack_power, defense,
+                                                                      attack_speed, skills, awaken_bonus)
+        new_legendary_creature.set_elements(elements)
+        new_legendary_creature.max_hp_percentage_up = max(legendary_creature1.max_hp_percentage_up,
+                                                          legendary_creature2.max_hp_percentage_up)
+        new_legendary_creature.max_magic_points_percentage_up = max(legendary_creature1.max_magic_points_percentage_up,
+                                                                    legendary_creature2.max_magic_points_percentage_up)
+        new_legendary_creature.attack_power_percentage_up = max(legendary_creature1.attack_power_percentage_up,
+                                                                legendary_creature2.attack_power_percentage_up)
+        new_legendary_creature.attack_speed_percentage_up = max(legendary_creature1.attack_speed_percentage_up,
+                                                                legendary_creature2.attack_speed_percentage_up)
+        new_legendary_creature.defense_percentage_up = max(legendary_creature1.defense_percentage_up,
+                                                           legendary_creature2.defense_percentage_up)
+        new_legendary_creature.crit_damage_up = max(legendary_creature1.crit_damage_up,
+                                                    legendary_creature2.crit_damage_up)
+        self.remove_legendary_creature(legendary_creature1)
+        self.remove_legendary_creature(legendary_creature2)
+        self.add_legendary_creature(new_legendary_creature)
+        return True
 
     def give_item_to_legendary_creature(self, item, legendary_creature):
         # type: (Item, LegendaryCreature) -> bool
@@ -876,7 +1119,7 @@ class Player:
             self.remove_item_from_inventory(item)
             return True
         elif isinstance(item, AwakenShard):
-            if item.legendary_creature_name == legendary_creature.name:
+            if item.legendary_creature_element in legendary_creature.get_elements():
                 legendary_creature.awaken()
                 self.remove_item_from_inventory(item)
                 return True
@@ -947,10 +1190,63 @@ class Player:
 
         return True
 
+    def add_legendary_creature_to_habitat(self, legendary_creature, habitat):
+        # type: (LegendaryCreature, Habitat) -> bool
+        if legendary_creature not in self.legendary_creature_inventory.get_legendary_creatures() or \
+                legendary_creature in self.battle_team.get_legendary_creatures() or \
+                legendary_creature.placed_in_training_area:
+            return False
+
+        habitat_exists: bool = False
+        for section in self.player_city.get_sections():
+            for y in range(section.SECTION_HEIGHT):
+                for x in range(section.SECTION_WIDTH):
+                    curr_tile: CityTile = section.get_tile_at(x, y)
+                    if curr_tile.building == habitat:
+                        habitat_exists = True
+                        break
+
+        if not habitat_exists:
+            return False
+
+        if habitat.add_legendary_creature(legendary_creature):
+            legendary_creature.player_gold_per_second += habitat.player_gold_per_second_increase
+            self.gold_per_second += habitat.player_gold_per_second_increase
+            legendary_creature.placed_in_habitat = True
+            return True
+        return False
+
+    def remove_legendary_creature_from_habitat(self, legendary_creature, habitat):
+        # type: (LegendaryCreature, Habitat) -> bool
+        if legendary_creature not in self.legendary_creature_inventory.get_legendary_creatures() or \
+                legendary_creature in self.battle_team.get_legendary_creatures() or \
+                legendary_creature.placed_in_training_area:
+            return False
+
+        habitat_exists: bool = False
+        for section in self.player_city.get_sections():
+            for y in range(section.SECTION_HEIGHT):
+                for x in range(section.SECTION_WIDTH):
+                    curr_tile: CityTile = section.get_tile_at(x, y)
+                    if curr_tile.building == habitat:
+                        habitat_exists = True
+                        break
+
+        if not habitat_exists:
+            return False
+
+        if habitat.remove_legendary_creature(legendary_creature):
+            legendary_creature.player_gold_per_second -= habitat.player_gold_per_second_increase
+            self.gold_per_second -= habitat.player_gold_per_second_increase
+            legendary_creature.placed_in_habitat = False
+            return True
+        return False
+
     def add_legendary_creature_to_training_area(self, legendary_creature, training_area):
         # type: (LegendaryCreature, TrainingArea) -> bool
         if legendary_creature not in self.legendary_creature_inventory.get_legendary_creatures() or \
-                legendary_creature in self.battle_team.get_legendary_creatures():
+                legendary_creature in self.battle_team.get_legendary_creatures() or \
+                legendary_creature.placed_in_habitat:
             return False
 
         training_area_exists: bool = False
@@ -974,7 +1270,8 @@ class Player:
     def remove_legendary_creature_from_training_area(self, legendary_creature, training_area):
         # type: (LegendaryCreature, TrainingArea) -> bool
         if legendary_creature not in self.legendary_creature_inventory.get_legendary_creatures() or \
-                legendary_creature in self.battle_team.get_legendary_creatures():
+                legendary_creature in self.battle_team.get_legendary_creatures() or \
+                legendary_creature.placed_in_habitat:
             return False
 
         training_area_exists: bool = False
@@ -1093,6 +1390,10 @@ class Player:
                     initial_exp_per_second: mpf = curr_building.exp_per_second
                     curr_building.level_up()
                     self.exp_per_second += (curr_building.exp_per_second - initial_exp_per_second)
+                elif isinstance(curr_building, FoodFarm):
+                    initial_food_per_second: mpf = curr_building.food_per_second
+                    curr_building.level_up()
+                    self.food_per_second += (curr_building.food_per_second - initial_food_per_second)
                 elif isinstance(curr_building, GoldMine):
                     initial_gold_per_second: mpf = curr_building.gold_per_second
                     curr_building.level_up()
@@ -1101,6 +1402,15 @@ class Player:
                     initial_gems_per_second: mpf = curr_building.gem_per_second
                     curr_building.level_up()
                     self.gems_per_second += (curr_building.gem_per_second - initial_gems_per_second)
+                elif isinstance(curr_building, Habitat):
+                    initial_gold_per_second: mpf = curr_building.player_gold_per_second_increase
+                    curr_building.level_up()
+                    for legendary_creature in curr_building.get_legendary_creatures_placed():
+                        legendary_creature.player_gold_per_second += (curr_building.player_gold_per_second_increase -
+                                                                      initial_gold_per_second)
+                        self.gold_per_second += (curr_building.player_gold_per_second_increase -
+                                                 initial_gold_per_second)
+
                 else:
                     curr_building.level_up()
                 return True
@@ -1171,6 +1481,8 @@ class Player:
                         building.legendary_creature_attack_speed_percentage_up
             elif isinstance(building, PlayerEXPTower):
                 self.exp_per_second += building.exp_per_second
+            elif isinstance(building, FoodFarm):
+                self.food_per_second += building.food_per_second
             elif isinstance(building, GoldMine):
                 self.gold_per_second += building.gold_per_second
             elif isinstance(building, GemMine):
@@ -1243,6 +1555,8 @@ class Player:
                             curr_building.legendary_creature_attack_speed_percentage_up
                 elif isinstance(curr_building, PlayerEXPTower):
                     self.exp_per_second -= curr_building.exp_per_second
+                elif isinstance(curr_building, FoodFarm):
+                    self.food_per_second -= curr_building.food_per_second
                 elif isinstance(curr_building, GoldMine):
                     self.gold_per_second -= curr_building.gold_per_second
                 elif isinstance(curr_building, GemMine):
@@ -1341,13 +1655,17 @@ class Player:
 
     def add_legendary_creature(self, legendary_creature):
         # type: (LegendaryCreature) -> None
+        self.gold_per_second += legendary_creature.player_gold_per_second
         self.legendary_creature_inventory.add_legendary_creature(legendary_creature)
 
     def remove_legendary_creature(self, legendary_creature):
         # type: (LegendaryCreature) -> bool
-        if legendary_creature in self.battle_team.get_legendary_creatures():
+        if legendary_creature in self.battle_team.get_legendary_creatures() or \
+                legendary_creature.placed_in_training_area or legendary_creature.placed_in_habitat:
             return False
-        return self.legendary_creature_inventory.remove_legendary_creature(legendary_creature)
+        if self.legendary_creature_inventory.remove_legendary_creature(legendary_creature):
+            self.gold_per_second -= legendary_creature.player_gold_per_second
+            return True
 
     def add_legendary_creature_to_team(self, legendary_creature):
         # type: (LegendaryCreature) -> bool
@@ -1389,14 +1707,51 @@ class Player:
         if friend not in self.__friends:
             return False
 
-        random_reward: Reward = Reward()  # TODO: generate random reward
+        random_reward: Reward = Reward(mpf("10") ** random.randint(10, 20),
+                                       mpf("10") ** random.randint(7, 17),
+                                       mpf("10") ** random.randint(5, 15),
+                                       mpf("10") ** random.randint(10, 20))
         self.friend_points += 10
-        # TODO: ensure 'friend' receives the reward
+        friend.claim_reward(random_reward)
 
     def add_unlocked_level(self):
         # type: () -> None
         new_level_number: int = Level.LEVEL_NUMBER + 1
-        new_level: Level = Level([], Reward())  # TODO: code to be updated later
+        level_stages: list = []  # initial value
+        for i in range(5):
+            level_stages.append(Stage([generate_random_legendary_creature(
+                Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+            ),
+                generate_random_legendary_creature(
+                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                ),
+                generate_random_legendary_creature(
+                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                ),
+                generate_random_legendary_creature(
+                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                ),
+                generate_random_legendary_creature(
+                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                )]))
+
+        level_ups: int = 5 * (new_level_number - 1)
+        for stage in level_stages:
+            for legendary_creature in stage.get_enemies_list():
+                for k in range(level_ups):
+                    legendary_creature.exp = legendary_creature.required_exp
+                    legendary_creature.level_up()
+
+        new_level: Level = Level(level_stages, Reward(
+            mpf("10") ** (5 * new_level_number),
+            mpf("10") ** (5 * new_level_number),
+            mpf(5 * new_level_number),
+            mpf("10") ** (5 * new_level_number),
+            [Egg(mpf("1e6"), mpf("10"),
+                 Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]),
+             AwakenShard(mpf("1e6"), mpf("10"),
+                         Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)])]
+        ))
         self.__unlocked_levels.append(new_level)
 
     def clone(self):
@@ -1741,7 +2096,7 @@ class LegendaryCreature:
         self.exp: mpf = mpf("0")
         self.required_exp: mpf = mpf("1e6")
         self.exp_per_second: mpf = mpf("0")
-        self.player_gold_per_second: mpf = mpf("0")
+        self.player_gold_per_second: mpf = mpf(int(max_hp / 500))
         self.curr_hp: mpf = max_hp
         self.max_hp: mpf = max_hp
         self.curr_magic_points: mpf = max_magic_points
@@ -1798,7 +2153,12 @@ class LegendaryCreature:
         self.passive_skills_activated: bool = False
         self.leader_skills_activated: bool = False
         self.placed_in_training_area: bool = False
+        self.placed_in_habitat: bool = False
         self.corresponding_team: Team = Team()
+
+    def set_elements(self, elements):
+        # type: (list) -> None
+        self.__elements = elements
 
     def restore(self):
         # type: () -> None
@@ -2210,6 +2570,7 @@ class LegendaryCreature:
 
             self.attack_power *= triangular(self.level)
             self.max_hp *= triangular(self.level)
+            self.player_gold_per_second *= triangular(self.level)
             self.max_magic_points *= triangular(self.level)
             self.defense *= triangular(self.level)
             self.attack_speed += 2
@@ -2440,6 +2801,18 @@ class Egg(Item):
     """
     This class contains attributes of an egg which can be hatched for legendary creatures to come out.
     """
+
+    POTENTIAL_ELEMENTS: list = ["TERRA", "FLAME", "SEA", "NATURE", "ELECTRIC", "ICE", "METAL", "DARK", "LIGHT", "WAR",
+                                "PURE", "LEGEND", "PRIMAL", "WIND", "BEAUTY", "MAGIC", "CHAOS", "HAPPY", "DREAM",
+                                "SOUL"]
+
+    def __init__(self, gold_cost, gem_cost, element):
+        # type: (mpf, mpf, str) -> None
+        Item.__init__(self, str(element if element in self.POTENTIAL_ELEMENTS else self.POTENTIAL_ELEMENTS[0]).upper() +
+                      " EGG", "An egg which can be hatched for legendary creatures to come out.",
+                      gold_cost, gem_cost)
+        self.hatch_time: datetime or None = None  # initial value
+        self.element: str = element
 
 
 class Rune(Item):
@@ -3234,6 +3607,40 @@ class Building:
         return copy.deepcopy(self)
 
 
+class Hatchery(Building):
+    """
+    This class contains attributes of a hatchery used to hatch eggs of legendary creatures.
+    """
+
+    MAX_EGGS: int = 5
+
+    def __init__(self, gold_cost, gem_cost):
+        # type: (mpf, mpf) -> None
+        Building.__init__(self, "HATCHERY", "A hatchery to hatch eggs and gain new legendary creatures.",
+                          gold_cost, gem_cost)
+        self.__eggs_placed: list = []  # initial value
+        self.upgrade_gold_cost = mpf("0")
+        self.upgrade_gem_cost = mpf("0")
+
+    def get_eggs_placed(self):
+        # type: () -> list
+        return self.__eggs_placed
+
+    def add_egg(self, egg):
+        # type: (Egg) -> bool
+        if len(self.__eggs_placed) < self.MAX_EGGS:
+            self.__eggs_placed.append(egg)
+            return True
+        return False
+
+    def remove_egg(self, egg):
+        # type: (Egg) -> bool
+        if egg in self.__eggs_placed:
+            self.__eggs_placed.remove(egg)
+            return True
+        return False
+
+
 class TrainingArea(Building):
     """
     This class contains attributes of a training area to automatically increase the EXP of legendary creatures.
@@ -3279,9 +3686,9 @@ class Tree(Building):
     This class contains attributes of a tree used to decorate a section.
     """
 
-    def __init__(self, gold_cost, gem_cost):
-        # type: (mpf, mpf) -> None
-        Building.__init__(self, "TREE", "A tree.", gold_cost, gem_cost)
+    def __init__(self):
+        # type: () -> None
+        Building.__init__(self, "TREE", "A tree.", mpf("0"), mpf("0"))
 
 
 class Guardstone(Building):
@@ -3465,6 +3872,8 @@ class PowerUpCircle(Building):
                           gold_cost, gem_cost)
         self.legendary_creature_to_power_up: LegendaryCreature or None = None
         self.__material_legendary_creatures: list = []  # initial value
+        self.upgrade_gold_cost = mpf("0")
+        self.upgrade_gem_cost = mpf("0")
 
     def execute_power_up(self):
         # type: () -> LegendaryCreature or None
@@ -3542,12 +3951,42 @@ class Habitat(Building):
     POTENTIAL_ELEMENTS: list = ["TERRA", "FLAME", "SEA", "NATURE", "ELECTRIC", "ICE", "METAL", "DARK", "LIGHT", "WAR",
                                 "PURE", "LEGEND", "PRIMAL", "WIND", "BEAUTY", "MAGIC", "CHAOS", "HAPPY", "DREAM",
                                 "SOUL"]
+    MAX_LEGENDARY_CREATURES: int = 10
 
-    def __init__(self, gold_cost, gem_cost, element):
-        # type: (mpf, mpf, str) -> None
-        Building.__init__(self, str(element).upper() + " HABITAT", "A habitat for " + str(element) +
+    def __init__(self, gold_cost, gem_cost, element, player_gold_per_second_increase):
+        # type: (mpf, mpf, str, mpf) -> None
+        Building.__init__(self, str(element if element in self.POTENTIAL_ELEMENTS else
+                                    self.POTENTIAL_ELEMENTS[0]).upper() +
+                          " HABITAT", "A habitat for " + str(element) +
                           " legendary creatures.", gold_cost, gem_cost)
-        self.element: str = element
+        self.element: str = element if element in self.POTENTIAL_ELEMENTS else self.POTENTIAL_ELEMENTS[0]
+        self.player_gold_per_second_increase: mpf = player_gold_per_second_increase
+        self.__legendary_creatures_placed: list = []  # initial value
+
+    def get_legendary_creatures_placed(self):
+        # type: () -> list
+        return self.__legendary_creatures_placed
+
+    def add_legendary_creature(self, legendary_creature):
+        # type: (LegendaryCreature) -> bool
+        if len(self.__legendary_creatures_placed) < self.MAX_LEGENDARY_CREATURES:
+            self.__legendary_creatures_placed.append(legendary_creature)
+            return True
+        return False
+
+    def remove_legendary_creature(self, legendary_creature):
+        # type: (LegendaryCreature) -> bool
+        if legendary_creature in self.__legendary_creatures_placed:
+            self.__legendary_creatures_placed.remove(legendary_creature)
+            return True
+        return False
+
+    def level_up(self):
+        # type: () -> None
+        self.level += 1
+        self.player_gold_per_second_increase *= mpf("10") ** (self.level / 2)
+        self.upgrade_gold_cost *= mpf("10") ** self.level
+        self.upgrade_gem_cost *= mpf("10") ** self.level
 
 
 class Obstacle(Building):
@@ -3574,6 +4013,8 @@ class TempleOfWishes(Building):
         self.__obtainable_objects: list = obtainable_objects
         self.wishes_left: int = 3  # The number of wishes a player can make in a day.
         self.already_reset: bool = False
+        self.upgrade_gold_cost = mpf("0")
+        self.upgrade_gem_cost = mpf("0")
 
     def reset_wishes_left(self):
         # type: () -> bool
@@ -3602,6 +4043,8 @@ class FusionCenter(Building):
         # type: (mpf, mpf) -> None
         Building.__init__(self, "FUSION CENTER", "A building used to fuse legendary creatures into a stronger one.",
                           gold_cost, gem_cost)
+        self.upgrade_gold_cost = mpf("0")
+        self.upgrade_gem_cost = mpf("0")
 
 
 class ItemShop:
@@ -3715,12 +4158,17 @@ class Game:
     This class contains attributes of the saved game data.
     """
 
-    def __init__(self, player_data, item_shop, building_shop, battle_arena):
-        # type: (Player, ItemShop, BuildingShop, Arena) -> None
+    def __init__(self, player_data, item_shop, building_shop, battle_arena, minigames):
+        # type: (Player, ItemShop, BuildingShop, Arena, list) -> None
         self.player_data: Player = player_data
         self.item_shop: ItemShop = item_shop
         self.building_shop: BuildingShop = building_shop
         self.battle_arena: Arena = battle_arena
+        self.__minigames: list = minigames
+
+    def get_minigames(self):
+        # type: () -> list
+        return self.__minigames
 
     def __str__(self):
         # type: () -> str
@@ -3922,18 +4370,105 @@ def main() -> int:
 
     # Initialising important variables to be used throughout the main function.
     # 1. The item shop
-    item_shop: ItemShop = ItemShop()
+    runes: list = []  # initial value
+    for rating in range(Rune.MIN_RATING, Rune.MAX_RATING + 1):
+        for slot_number in range(Rune.MIN_SLOT_NUMBER, Rune.MAX_SLOT_NUMBER + 1):
+            for set_name in Rune.POTENTIAL_SET_NAMES:
+                for main_stat in Rune.POTENTIAL_MAIN_STATS:
+                    name: str = str(rating) + "-STAR " + str(set_name).upper() + " RUNE - SLOT " + str(slot_number)
+                    description: str = str(set_name).upper() + " rune of rating " + str(rating) + " at slot " + \
+                                       str(slot_number)
+                    gold_cost: mpf = mpf("10") ** (6 + 5 * (rating - 1))
+                    gem_cost: mpf = 0 if rating == 1 else 10 * triangular(rating)
+                    new_rune: Rune = Rune(name, description, gold_cost, gem_cost, rating, slot_number, set_name,
+                                          main_stat)
+                    runes.append(new_rune)
+
+    eggs: list = []  # initial value
+    for element in Egg.POTENTIAL_ELEMENTS:
+        new_egg: Egg = Egg(mpf("1e6"), mpf("10"), element)
+        eggs.append(new_egg)
+
+    awaken_shards: list = []  # initial value
+    for element in Egg.POTENTIAL_ELEMENTS:
+        new_awaken_shard: AwakenShard = AwakenShard(mpf("1e6"), mpf("10"), element)
+        awaken_shards.append(new_awaken_shard)
+
+    items: list = [rune for rune in runes] + [egg for egg in eggs] + \
+                  [awaken_shard for awaken_shard in awaken_shards]
+    items = items + [EXPShard(mpf("1e6"), mpf("10"), mpf("1e5")),
+                     LevelUpShard(mpf("1e6"), mpf("10")),
+                     SkillLevelUpShard(mpf("1e6"), mpf("10"))]
+    item_shop: ItemShop = ItemShop(items)
 
     # 2. The building shop
-    building_shop: BuildingShop = BuildingShop()
+    building_shop: BuildingShop = BuildingShop([
 
-    # 3. The battle arena
-    battle_arena: Arena = Arena()
+    ])
+
+    # 3. Initialising potential CPU players the player can face
+    potential_cpu_players: list = [
+        CPU("CPU #1"),
+        CPU("CPU #2"),
+        CPU("CPU #3"),
+        CPU("CPU #4"),
+        CPU("CPU #5"),
+        CPU("CPU #6"),
+        CPU("CPU #7"),
+        CPU("CPU #8"),
+        CPU("CPU #9"),
+        CPU("CPU #10")
+    ]
+
+    index: int = 1  # initial value
+    for cpu_player in potential_cpu_players:
+        assert isinstance(cpu_player, CPU), "Invalid argument in list 'potential_cpu_players'!"
+        cpu_player.battle_team = Team([generate_random_legendary_creature(
+                Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+            ),
+                generate_random_legendary_creature(
+                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                ),
+                generate_random_legendary_creature(
+                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                ),
+                generate_random_legendary_creature(
+                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                ),
+                generate_random_legendary_creature(
+                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                )])
+        level_ups: int = 5 * index
+        for legendary_creature in cpu_player.battle_team.get_legendary_creatures():
+            for k in range(level_ups):
+                legendary_creature.exp = legendary_creature.required_exp
+                legendary_creature.level_up()
+
+        index += 1
+
+    # 4. The battle arena
+    battle_arena: Arena = Arena(potential_cpu_players)
+
+    # 5. Minigames the player can play in
+    minigames: list = [
+        Minigame("BOX EATS PLANTS", [
+
+        ]),
+        Minigame("MATCH WORD PUZZLE", [
+
+        ]),
+        Minigame("MATCH-3 GAME", [
+
+        ]),
+        Minigame("DAILY BONUS", [
+
+        ])
+    ]
 
     # Initialising variable for the saved game data
     # Asking the user to enter his/her name to check whether saved game data exists or not
     player_name: str = input("Please enter your name: ")
-    file_name: str = "SAVED ANCIENT INVASION GAME DATA - " + str(player_name).upper()
+    file_name: str = "SAVED LEGENDARY CREATURE CITY BUILDER GAME DATA - " + str(player_name).upper()
 
     new_game: Game
     try:
@@ -3950,7 +4485,7 @@ def main() -> int:
         print("Sorry! No saved game data with player name '" + str(player_name) + "' is available!")
         name: str = input("Please enter your name: ")
         player_data: Player = Player(name)
-        new_game = Game(player_data, item_shop, building_shop, battle_arena)
+        new_game = Game(player_data, item_shop, building_shop, battle_arena, minigames)
 
     # Getting the current date and time
     old_now: datetime = datetime.now()
@@ -3966,6 +4501,35 @@ def main() -> int:
         time_difference = new_now - old_now
         seconds: int = time_difference.seconds
         old_now = new_now
+
+        # Resetting all temple of wishes if possible
+        if new_now.day != old_now.day:
+            for section in new_game.player_data.player_city.get_sections():
+                for x in range(section.SECTION_WIDTH):
+                    for y in range(section.SECTION_HEIGHT):
+                        curr_tile: CityTile = section.get_tile_at(x, y)
+                        if isinstance(curr_tile.building, TempleOfWishes):
+                            temple_of_wishes: TempleOfWishes = curr_tile.building
+                            temple_of_wishes.restore()
+                            temple_of_wishes.reset_wishes_left()
+
+        # Increase player's EXP, gold, and gems
+        new_game.player_data.exp += new_game.player_data.exp_per_second * seconds
+        new_game.player_data.level_up()
+        new_game.player_data.gold += new_game.player_data.gold_per_second * seconds
+        new_game.player_data.gems += new_game.player_data.gems_per_second * seconds
+
+        # Increase the exp of all legendary creatures owned by the player
+        for legendary_creature in new_game.player_data.legendary_creature_inventory.get_legendary_creatures():
+            legendary_creature.exp += legendary_creature.exp_per_second * seconds
+            legendary_creature.level_up()
+
+        # Resetting minigames if possible
+        for minigame in minigames:
+            minigame.reset()
+
+        # Hatching all eggs in hatcheries
+        new_game.player_data.hatch_eggs_in_hatcheries()
 
         print("Enter 'Y' for yes.")
         print("Enter anything else for no.")

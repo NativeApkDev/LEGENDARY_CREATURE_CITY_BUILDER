@@ -3,8 +3,9 @@
 - The players can build on their cities and grow legendary creatures.
 - The item shop sells eggs for all possible elements of legendary creatures.
 - The item shop sells runes of all ratings (i.e., 1 to 6).
+- Minigames can be played
 
-2. Version 2 (Release Date: TBA)
+2. Version 2 (Release Date: TBA):
 - Players can join guilds.
 - "Guild Battle" feature to be added.
 - Allows the player to send gifts to other player.
