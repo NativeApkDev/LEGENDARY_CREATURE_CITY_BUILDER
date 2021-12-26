@@ -504,77 +504,6 @@ class CPU(Player):
         self.times_beaten: int = 0  # initial value
 
 
-class Conversation:
-    """
-    This class contains attribute of a chat conversation between one player and another.
-    """
-
-    def __init__(self, player1, player2):
-        # type: (Player, Player) -> None
-        self.player1: Player = player1
-        self.player2: Player = player2
-        self.__messages: list = []  # initial value
-
-    def __str__(self):
-        # type: () -> str
-        res: str = str(type(self).__name__) + "("  # initial value
-        index: int = 0  # initial value
-        for item in vars(self).items():
-            res += str(item[0]) + "=" + str(item[1])
-
-            if index < len(vars(self).items()) - 1:
-                res += ", "
-
-            index += 1
-
-        return res + ")"
-
-    def get_messages(self):
-        # type: () -> list
-        return self.__messages
-
-    def add_message(self, message):
-        # type: (Message) -> bool
-        if message.sender not in [self.player1, self.player2]:
-            return False
-        self.__messages.append(message)
-        return True
-
-    def clone(self):
-        # type: () -> Conversation
-        return copy.deepcopy(self)
-
-
-class Message:
-    """
-    This class contains attributes of a message sent by a player in a conversation.
-    """
-
-    def __init__(self, sender, contents):
-        # type: (Player, str) -> None
-        self.time_sent: datetime = datetime.now()
-        self.sender: Player = sender
-        self.contents: str = contents
-
-    def __str__(self):
-        # type: () -> str
-        res: str = str(type(self).__name__) + "("  # initial value
-        index: int = 0  # initial value
-        for item in vars(self).items():
-            res += str(item[0]) + "=" + str(item[1])
-
-            if index < len(vars(self).items()) - 1:
-                res += ", "
-
-            index += 1
-
-        return res + ")"
-
-    def clone(self):
-        # type: () -> Message
-        return copy.deepcopy(self)
-
-
 class PlayerCity:
     """
     This class contains attributes of the city the player builds.
@@ -650,6 +579,26 @@ class Team:
         else:
             self.leader = leader
 
+    def add_legendary_creature(self, legendary_creature):
+        # type: (LegendaryCreature) -> bool
+        if len(self.__legendary_creatures) < self.MAX_LEGENDARY_CREATURES:
+            self.__legendary_creatures.append(legendary_creature)
+            self.set_leader()
+            return True
+        return False
+
+    def remove_legendary_creature(self, legendary_creature):
+        # type: (LegendaryCreature) -> bool
+        if legendary_creature in self.__legendary_creatures:
+            self.__legendary_creatures.remove(legendary_creature)
+            self.set_leader()
+            return True
+        return False
+
+    def get_legendary_creatures(self):
+        # type: () -> list
+        return self.__legendary_creatures
+
     def __str__(self):
         # type: () -> str
         res: str = str(type(self).__name__) + "("  # initial value
@@ -674,6 +623,25 @@ class LegendaryCreatureInventory:
     This class contains attributes of an inventory containing legendary creatures.
     """
 
+    def __init__(self):
+        # type: () -> None
+        self.__legendary_creatures: list = []  # initial value
+
+    def add_legendary_creature(self, legendary_creature):
+        # type: (LegendaryCreature) -> None
+        self.__legendary_creatures.append(legendary_creature)
+
+    def remove_legendary_creature(self, legendary_creature):
+        # type: (LegendaryCreature) -> bool
+        if legendary_creature in self.__legendary_creatures:
+            self.__legendary_creatures.remove(legendary_creature)
+            return True
+        return False
+
+    def get_legendary_creatures(self):
+        # type: () -> list
+        return self.__legendary_creatures
+
     def __str__(self):
         # type: () -> str
         res: str = str(type(self).__name__) + "("  # initial value
@@ -688,6 +656,10 @@ class LegendaryCreatureInventory:
 
         return res + ")"
 
+    def clone(self):
+        # type: () -> LegendaryCreatureInventory
+        return copy.deepcopy(self)
+
 
 class ItemInventory:
     """
@@ -697,6 +669,17 @@ class ItemInventory:
     def __init__(self):
         # type: () -> None
         self.__items: list = []  # initial value
+
+    def add_item(self, item):
+        # type: (Item) -> None
+        self.__items.append(item)
+
+    def remove_item(self, item):
+        # type: (Item) -> bool
+        if item in self.__items:
+            self.__items.remove(item)
+            return True
+        return False
 
     def get_items(self):
         # type: () -> list
@@ -715,6 +698,10 @@ class ItemInventory:
             index += 1
 
         return res + ")"
+
+    def clone(self):
+        # type: () -> ItemInventory
+        return copy.deepcopy(self)
 
 
 class LegendaryCreature:
@@ -1077,6 +1064,33 @@ class Reward:
     """
 
 
+class Game:
+    """
+    This class contains attributes of the saved game data.
+    """
+
+    def __init__(self, player_data, item_shop, building_shop, battle_arena):
+        # type: (Player, ItemShop, BuildingShop, Arena) -> None
+        self.player_data: Player = player_data
+        self.item_shop: ItemShop = item_shop
+        self.building_shop: BuildingShop = building_shop
+        self.battle_arena: Arena = battle_arena
+
+    def __str__(self):
+        # type: () -> str
+        res: str = str(type(self).__name__) + "("  # initial value
+        index: int = 0  # initial value
+        for item in vars(self).items():
+            res += str(item[0]) + "=" + str(item[1])
+
+            if index < len(vars(self).items()) - 1:
+                res += ", "
+
+            index += 1
+
+        return res + ")"
+
+
 ########################################### VERSION 2 FEATURES (DRAFT CODE) ###########################################
 
 
@@ -1161,20 +1175,16 @@ class GuildBattle:
         return res + ")"
 
 
-########################################### VERSION 2 FEATURES (DRAFT CODE) ###########################################
-
-
-class Game:
+class Conversation:
     """
-    This class contains attributes of the saved game data.
+    This class contains attribute of a chat conversation between one player and another.
     """
 
-    def __init__(self, player_data, item_shop, building_shop, battle_arena):
-        # type: (Player, ItemShop, BuildingShop, Arena) -> None
-        self.player_data: Player = player_data
-        self.item_shop: ItemShop = item_shop
-        self.building_shop: BuildingShop = building_shop
-        self.battle_arena: Arena = battle_arena
+    def __init__(self, player1, player2):
+        # type: (Player, Player) -> None
+        self.player1: Player = player1
+        self.player2: Player = player2
+        self.__messages: list = []  # initial value
 
     def __str__(self):
         # type: () -> str
@@ -1189,6 +1199,54 @@ class Game:
             index += 1
 
         return res + ")"
+
+    def get_messages(self):
+        # type: () -> list
+        return self.__messages
+
+    def add_message(self, message):
+        # type: (Message) -> bool
+        if message.sender not in [self.player1, self.player2]:
+            return False
+        self.__messages.append(message)
+        return True
+
+    def clone(self):
+        # type: () -> Conversation
+        return copy.deepcopy(self)
+
+
+class Message:
+    """
+    This class contains attributes of a message sent by a player in a conversation.
+    """
+
+    def __init__(self, sender, contents):
+        # type: (Player, str) -> None
+        self.time_sent: datetime = datetime.now()
+        self.sender: Player = sender
+        self.contents: str = contents
+
+    def __str__(self):
+        # type: () -> str
+        res: str = str(type(self).__name__) + "("  # initial value
+        index: int = 0  # initial value
+        for item in vars(self).items():
+            res += str(item[0]) + "=" + str(item[1])
+
+            if index < len(vars(self).items()) - 1:
+                res += ", "
+
+            index += 1
+
+        return res + ")"
+
+    def clone(self):
+        # type: () -> Message
+        return copy.deepcopy(self)
+
+
+########################################### VERSION 2 FEATURES (DRAFT CODE) ###########################################
 
 
 # Creating the main method used to runt the game.
