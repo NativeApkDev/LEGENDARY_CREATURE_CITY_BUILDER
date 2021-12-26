@@ -1720,19 +1720,19 @@ class Player:
         level_stages: list = []  # initial value
         for i in range(5):
             level_stages.append(Stage([generate_random_legendary_creature(
-                Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
             ),
                 generate_random_legendary_creature(
-                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                    Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
                 ),
                 generate_random_legendary_creature(
-                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                    Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
                 ),
                 generate_random_legendary_creature(
-                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                    Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
                 ),
                 generate_random_legendary_creature(
-                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                    Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
                 )]))
 
         level_ups: int = 5 * (new_level_number - 1)
@@ -1741,6 +1741,8 @@ class Player:
                 for k in range(level_ups):
                     legendary_creature.exp = legendary_creature.required_exp
                     legendary_creature.level_up()
+                    if legendary_creature.level == legendary_creature.max_level:
+                        legendary_creature.evolve()
 
         new_level: Level = Level(level_stages, Reward(
             mpf("10") ** (5 * new_level_number),
@@ -1748,9 +1750,9 @@ class Player:
             mpf(5 * new_level_number),
             mpf("10") ** (5 * new_level_number),
             [Egg(mpf("1e6"), mpf("10"),
-                 Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]),
+                 Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]),
              AwakenShard(mpf("1e6"), mpf("10"),
-                         Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)])]
+                         Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)])]
         ))
         self.__unlocked_levels.append(new_level)
 
@@ -3686,9 +3688,9 @@ class Tree(Building):
     This class contains attributes of a tree used to decorate a section.
     """
 
-    def __init__(self):
-        # type: () -> None
-        Building.__init__(self, "TREE", "A tree.", mpf("0"), mpf("0"))
+    def __init__(self, gold_cost, gem_cost):
+        # type: (mpf, mpf) -> None
+        Building.__init__(self, "TREE", "A tree.", gold_cost, gem_cost)
 
 
 class Guardstone(Building):
@@ -4184,6 +4186,39 @@ class Game:
 
         return res + ")"
 
+    def clone(self):
+        # type: () -> Game
+        return copy.deepcopy(self)
+
+
+class MultiplayerMode:
+    """
+    This class contains attributes of multiplayer mode in the game.
+    """
+
+    def __init__(self, game1, game2):
+        # type: (Game, Game) -> None
+        self.game1: Game = game1
+        self.game2: Game = game2
+
+    def __str__(self):
+        # type: () -> str
+        res: str = str(type(self).__name__) + "("  # initial value
+        index: int = 0  # initial value
+        for item in vars(self).items():
+            res += str(item[0]) + "=" + str(item[1])
+
+            if index < len(vars(self).items()) - 1:
+                res += ", "
+
+            index += 1
+
+        return res + ")"
+
+    def clone(self):
+        # type: () -> MultiplayerMode
+        return copy.deepcopy(self)
+
 
 ###########################################
 # VERSION 2 FEATURES (DRAFT CODE)
@@ -4402,9 +4437,36 @@ def main() -> int:
     item_shop: ItemShop = ItemShop(items)
 
     # 2. The building shop
-    building_shop: BuildingShop = BuildingShop([
+    habitats: list = []  # initial value
+    for element in Egg.POTENTIAL_ELEMENTS:
+        new_habitat: Habitat = Habitat(mpf("1e5"), mpf("1"), element, mpf("1e3"))
+        habitats.append(new_habitat)
 
-    ])
+    building_shop: BuildingShop = BuildingShop([
+        Hatchery(mpf("1e5"), mpf("1")),
+        TrainingArea(mpf("1e8"), mpf("1000")),
+        Tree(mpf("1e4"), mpf("0")),
+        Guardstone(mpf("1e7"), mpf("100")),
+        LegendaryCreatureSanctuary(mpf("1e7"), mpf("100")),
+        SurvivalAltar(mpf("1e7"), mpf("100")),
+        MagicAltar(mpf("1e7"), mpf("100")),
+        BoosterTower(mpf("1e7"), mpf("100")),
+        PlayerEXPTower(mpf("1e7"), mpf("100")),
+        FoodFarm(mpf("1e6"), mpf("10")),
+        GoldMine(mpf("1e6"), mpf("10")),
+        GemMine(mpf("1e6"), mpf("10")),
+        PowerUpCircle(mpf("1e5"), mpf("1")),
+        FusionCenter(mpf("1e8"), mpf("1000")),
+        TempleOfWishes(mpf("1e5"), mpf("1"), [Reward(player_reward_exp=mpf("1e6")),
+            Reward(player_reward_exp=mpf("5e6")),
+            Reward(player_reward_gold=mpf("1e5")),
+            Reward(player_reward_gold=mpf("5e5")),
+            Reward(player_reward_gems=mpf("10")),
+            Reward(player_reward_gems=mpf("50")),
+            Reward(legendary_creature_reward_exp=mpf("1e6")),
+            Reward(legendary_creature_reward_exp=mpf("5e6"))
+                                              ] + [item for item in items])
+    ] + [habitat for habitat in habitats])
 
     # 3. Initialising potential CPU players the player can face
     potential_cpu_players: list = [
@@ -4424,25 +4486,27 @@ def main() -> int:
     for cpu_player in potential_cpu_players:
         assert isinstance(cpu_player, CPU), "Invalid argument in list 'potential_cpu_players'!"
         cpu_player.battle_team = Team([generate_random_legendary_creature(
-                Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
             ),
                 generate_random_legendary_creature(
-                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                    Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
                 ),
                 generate_random_legendary_creature(
-                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                    Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
                 ),
                 generate_random_legendary_creature(
-                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                    Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
                 ),
                 generate_random_legendary_creature(
-                    Egg.POTENTIAL_ELEMENTS[random.randint(1, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+                    Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
                 )])
         level_ups: int = 5 * index
         for legendary_creature in cpu_player.battle_team.get_legendary_creatures():
             for k in range(level_ups):
                 legendary_creature.exp = legendary_creature.required_exp
                 legendary_creature.level_up()
+                if legendary_creature.level == legendary_creature.max_level:
+                    legendary_creature.evolve()
 
         index += 1
 
@@ -4451,18 +4515,7 @@ def main() -> int:
 
     # 5. Minigames the player can play in
     minigames: list = [
-        Minigame("BOX EATS PLANTS", [
-
-        ]),
-        Minigame("MATCH WORD PUZZLE", [
-
-        ]),
-        Minigame("MATCH-3 GAME", [
-
-        ]),
-        Minigame("DAILY BONUS", [
-
-        ])
+        Minigame("BOX EATS PLANTS"), Minigame("MATCH WORD PUZZLE"), Minigame("MATCH-3 GAME"), Minigame("DAILY BONUS")
     ]
 
     # Initialising variable for the saved game data
@@ -4502,7 +4555,7 @@ def main() -> int:
         seconds: int = time_difference.seconds
         old_now = new_now
 
-        # Resetting all temple of wishes if possible
+        # Resetting all temple of wishes and minigames if possible
         if new_now.day != old_now.day:
             for section in new_game.player_data.player_city.get_sections():
                 for x in range(section.SECTION_WIDTH):
@@ -4512,6 +4565,9 @@ def main() -> int:
                             temple_of_wishes: TempleOfWishes = curr_tile.building
                             temple_of_wishes.restore()
                             temple_of_wishes.reset_wishes_left()
+
+            for minigame in minigames:
+                minigame.reset()
 
         # Increase player's EXP, gold, and gems
         new_game.player_data.exp += new_game.player_data.exp_per_second * seconds
@@ -4524,12 +4580,24 @@ def main() -> int:
             legendary_creature.exp += legendary_creature.exp_per_second * seconds
             legendary_creature.level_up()
 
-        # Resetting minigames if possible
-        for minigame in minigames:
-            minigame.reset()
-
         # Hatching all eggs in hatcheries
         new_game.player_data.hatch_eggs_in_hatcheries()
+
+        # Asking the player what he/she wants to do in the game.
+        allowed: list = ["PLAY ADVENTURE MODE", "MANAGE PLAYER CITY", "MANAGE BATTLE TEAM",
+                         "MANAGE LEGENDARY CREATURE INVENTORY", "MANAGE ITEM INVENTORY", "MAKE A WISH",
+                         "FUSE LEGENDARY CREATURES", "PLACE EGG", "FEED LEGENDARY CREATURE",
+                         "GIVE ITEM", "POWER UP LEGENDARY CREATURE", "EVOLVE LEGENDARY CREATURE",
+                         "MANAGE HABITAT", "MANAGE TRAINING AREA", "PLACE RUNE", "REMOVE RUNE",
+                         "PLAY MINIGAME", "MULTIPLAYER BATTLE", "BATTLE ARENA", "BUY ITEM", "VIEW STATS"]
+
+        action: str = input("What do you want to do? ")
+        if action not in allowed:
+            # Saving game data and quitting the game
+            save_game_data(new_game, file_name)
+            sys.exit()
+
+        # TODO: add code for each functionality in the main function.
 
         print("Enter 'Y' for yes.")
         print("Enter anything else for no.")
