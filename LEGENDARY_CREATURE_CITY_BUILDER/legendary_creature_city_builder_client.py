@@ -6630,7 +6630,7 @@ def main() -> int:
                                           "you want to feed (0 - " +
                                           str(new_game.player_data.food) + "): "))
 
-                new_game.player_data.feed_legendary_creature(chosen_legendary_creature)
+                new_game.player_data.feed_legendary_creature(chosen_legendary_creature, food)
                 print("You have successfully fed " + str(food) + " food to " + str(chosen_legendary_creature.name) +
                       "!")
 
