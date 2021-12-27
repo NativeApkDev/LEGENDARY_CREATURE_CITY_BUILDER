@@ -920,6 +920,7 @@ class Player:
         self.__unlocked_levels: list = []  # initial value
         self.__friends: list = []  # initial value
         self.friend_points: int = 0  # initial value
+        self.add_unlocked_level()  # ensuring that the player has unlocked at least one level
 
     def __str__(self):
         # type: () -> str
@@ -1045,6 +1046,10 @@ class Player:
 
         if legendary_creature1 in self.battle_team.get_legendary_creatures() or \
                 legendary_creature2 in self.battle_team.get_legendary_creatures():
+            return False
+
+        if legendary_creature1.placed_in_training_area or legendary_creature1.placed_in_habitat or \
+                legendary_creature2.placed_in_training_area or legendary_creature2.placed_in_habitat:
             return False
 
         fusion_center_exists: bool = False
@@ -1209,7 +1214,7 @@ class Player:
         if not habitat_exists:
             return False
 
-        if habitat.add_legendary_creature(legendary_creature):
+        if habitat.add_legendary_creature(legendary_creature) and habitat.element in legendary_creature.get_elements():
             legendary_creature.player_gold_per_second += habitat.player_gold_per_second_increase
             self.gold_per_second += habitat.player_gold_per_second_increase
             legendary_creature.placed_in_habitat = True
@@ -1615,14 +1620,6 @@ class Player:
             return True
         return False
 
-    def add_new_section_to_player_city(self):
-        # type: () -> bool
-        if self.gold >= self.player_city.section_build_gold_cost:
-            self.gold -= self.player_city.section_build_gold_cost
-            self.player_city.add_section()
-            return True
-        return False
-
     def level_up_rune(self, rune):
         # type: (Rune) -> bool
         if rune in self.item_inventory.get_items():
@@ -1778,6 +1775,8 @@ class CPU(Player):
             for i in range(level_ups):
                 legendary_creature.exp = legendary_creature.required_exp
                 legendary_creature.level_up()
+                if legendary_creature.level == legendary_creature.max_level:
+                    legendary_creature.evolve()
 
 
 class PlayerCity:
@@ -1832,7 +1831,7 @@ class Section:
         for i in range(self.SECTION_WIDTH):
             new = []  # initial value
             for k in range(self.SECTION_HEIGHT):
-                # Ensuring that obstacles are not placed at the edges of the island
+                # Ensuring that obstacles are not placed at the edges of the section
                 place_obstacle: bool = random.random() <= 0.3
                 if place_obstacle and not self.is_edge(i, k):
                     new.append(CityTile(Obstacle()))
@@ -1878,8 +1877,8 @@ class CityTile:
     def __str__(self):
         # type: () -> str
         if isinstance(self.building, Building):
-            return "IslandTile(" + str(self.building.name) + ")"
-        return "IslandTile(GRASS)"
+            return "CityTile(" + str(self.building.name) + ")"
+        return "CityTile(GRASS)"
 
     def clone(self):
         # type: () -> CityTile
@@ -3448,8 +3447,6 @@ class DamageMultiplier:
             if curr_multiplier > damage_multiplier_by_element:
                 damage_multiplier_by_element = curr_multiplier
 
-        raw_damage *= damage_multiplier_by_element
-
         # Checking for critical hits
         crit_chance: mpf = user.crit_rate + user.crit_rate_up - target.crit_resist - target.crit_resist_up
         if crit_chance < LegendaryCreature.MIN_CRIT_RATE:
@@ -3458,7 +3455,8 @@ class DamageMultiplier:
         is_crit: bool = random.random() < crit_chance
         return raw_damage * damage_reduction_factor if not is_crit else raw_damage * (user.crit_damage +
                                                                                       user.crit_damage_up) * \
-                                                                        damage_reduction_factor
+                                                                        damage_reduction_factor * \
+                                                                        damage_multiplier_by_element
 
     def clone(self):
         # type: () -> DamageMultiplier
@@ -4443,30 +4441,31 @@ def main() -> int:
         habitats.append(new_habitat)
 
     building_shop: BuildingShop = BuildingShop([
-        Hatchery(mpf("1e5"), mpf("1")),
-        TrainingArea(mpf("1e8"), mpf("1000")),
-        Tree(mpf("1e4"), mpf("0")),
-        Guardstone(mpf("1e7"), mpf("100")),
-        LegendaryCreatureSanctuary(mpf("1e7"), mpf("100")),
-        SurvivalAltar(mpf("1e7"), mpf("100")),
-        MagicAltar(mpf("1e7"), mpf("100")),
-        BoosterTower(mpf("1e7"), mpf("100")),
-        PlayerEXPTower(mpf("1e7"), mpf("100")),
-        FoodFarm(mpf("1e6"), mpf("10")),
-        GoldMine(mpf("1e6"), mpf("10")),
-        GemMine(mpf("1e6"), mpf("10")),
-        PowerUpCircle(mpf("1e5"), mpf("1")),
-        FusionCenter(mpf("1e8"), mpf("1000")),
-        TempleOfWishes(mpf("1e5"), mpf("1"), [Reward(player_reward_exp=mpf("1e6")),
-            Reward(player_reward_exp=mpf("5e6")),
-            Reward(player_reward_gold=mpf("1e5")),
-            Reward(player_reward_gold=mpf("5e5")),
-            Reward(player_reward_gems=mpf("10")),
-            Reward(player_reward_gems=mpf("50")),
-            Reward(legendary_creature_reward_exp=mpf("1e6")),
-            Reward(legendary_creature_reward_exp=mpf("5e6"))
-                                              ] + [item for item in items])
-    ] + [habitat for habitat in habitats])
+                                                   Hatchery(mpf("1e5"), mpf("1")),
+                                                   TrainingArea(mpf("1e8"), mpf("1000")),
+                                                   Tree(mpf("1e4"), mpf("0")),
+                                                   Guardstone(mpf("1e7"), mpf("100")),
+                                                   LegendaryCreatureSanctuary(mpf("1e7"), mpf("100")),
+                                                   SurvivalAltar(mpf("1e7"), mpf("100")),
+                                                   MagicAltar(mpf("1e7"), mpf("100")),
+                                                   BoosterTower(mpf("1e7"), mpf("100")),
+                                                   PlayerEXPTower(mpf("1e7"), mpf("100")),
+                                                   FoodFarm(mpf("1e6"), mpf("10")),
+                                                   GoldMine(mpf("1e6"), mpf("10")),
+                                                   GemMine(mpf("1e6"), mpf("10")),
+                                                   PowerUpCircle(mpf("1e5"), mpf("1")),
+                                                   FusionCenter(mpf("1e8"), mpf("1000")),
+                                                   TempleOfWishes(mpf("1e5"), mpf("1"),
+                                                                  [Reward(player_reward_exp=mpf("1e6")),
+                                                                   Reward(player_reward_exp=mpf("5e6")),
+                                                                   Reward(player_reward_gold=mpf("1e5")),
+                                                                   Reward(player_reward_gold=mpf("5e5")),
+                                                                   Reward(player_reward_gems=mpf("10")),
+                                                                   Reward(player_reward_gems=mpf("50")),
+                                                                   Reward(legendary_creature_reward_exp=mpf("1e6")),
+                                                                   Reward(legendary_creature_reward_exp=mpf("5e6"))
+                                                                   ] + [item for item in items])
+                                               ] + [habitat for habitat in habitats])
 
     # 3. Initialising potential CPU players the player can face
     potential_cpu_players: list = [
@@ -4486,20 +4485,20 @@ def main() -> int:
     for cpu_player in potential_cpu_players:
         assert isinstance(cpu_player, CPU), "Invalid argument in list 'potential_cpu_players'!"
         cpu_player.battle_team = Team([generate_random_legendary_creature(
+            Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+        ),
+            generate_random_legendary_creature(
                 Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
             ),
-                generate_random_legendary_creature(
-                    Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
-                ),
-                generate_random_legendary_creature(
-                    Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
-                ),
-                generate_random_legendary_creature(
-                    Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
-                ),
-                generate_random_legendary_creature(
-                    Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
-                )])
+            generate_random_legendary_creature(
+                Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+            ),
+            generate_random_legendary_creature(
+                Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+            ),
+            generate_random_legendary_creature(
+                Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+            )])
         level_ups: int = 5 * index
         for legendary_creature in cpu_player.battle_team.get_legendary_creatures():
             for k in range(level_ups):
@@ -4590,14 +4589,1864 @@ def main() -> int:
                          "GIVE ITEM", "POWER UP LEGENDARY CREATURE", "EVOLVE LEGENDARY CREATURE",
                          "MANAGE HABITAT", "MANAGE TRAINING AREA", "PLACE RUNE", "REMOVE RUNE",
                          "PLAY MINIGAME", "MULTIPLAYER BATTLE", "BATTLE ARENA", "BUY ITEM", "VIEW STATS"]
-
+        print("Enter 'PLAY ADVENTURE MODE' to play in adventure mode.")
+        print("Enter 'MANAGE PLAYER CITY' to manage your city.")
+        print("Enter 'MANAGE BATTLE TEAM' to manage your battle team.")
+        print("Enter 'MANAGE LEGENDARY CREATURE INVENTORY' to manage your legendary creature inventory.")
+        print("Enter 'MANAGE ITEM INVENTORY' to manage your item inventory.")
+        print("Enter 'MAKE A WISH' to make a wish in a temple of wishes.")
+        print("Enter 'FUSE LEGENDARY CREATURES' to fuse legendary creatures using a fusion center.")
+        print("Enter 'PLACE EGG' to place an egg in the hatchery to get it hatched.")
+        print("Enter 'FEED LEGENDARY CREATURE' to feed a legendary creature and increase its EXP.")
+        print("Enter 'GIVE ITEM' to give an item to a legendary creature.")
+        print("Enter 'POWER UP LEGENDARY CREATURE' to power up legendary creatures.")
+        print("Enter 'EVOLVE LEGENDARY CREATURE' to evolve legendary creatures.")
+        print("Enter 'MANAGE HABITAT' to manage your habitat.")
+        print("Enter 'MANAGE TRAINING AREA' to manage your training area.")
+        print("Enter 'PLACE RUNE' to place a rune on a legendary creature.")
+        print("Enter 'REMOVE RUNE' to remove a rune from a legendary creature.")
+        print("Enter 'PLAY MINIGAME' to play a minigame.")
+        print("Enter 'MULTIPLAYER BATTLE' to battle against another player.")
+        print("Enter 'BATTLE ARENA' to battle against a CPU controlled player.")
+        print("Enter 'BUY ITEM' to purchase an item from the item shop.")
+        print("Enter 'VIEW STATS' to view your stats.")
         action: str = input("What do you want to do? ")
+        # TODO: add code for each functionality in the main function.
         if action not in allowed:
             # Saving game data and quitting the game
             save_game_data(new_game, file_name)
             sys.exit()
+        else:
+            if action == "VIEW STATS":
+                # Clearing the command line window
+                clear()
 
-        # TODO: add code for each functionality in the main function.
+                # Display player's stats
+                print(new_game.player_data)
+            elif action == "BUY ITEM":
+                # Clearing the command line window
+                clear()
+
+                # Show a list of items which the player can buy
+                item_list: list = new_game.item_shop.get_items_sold()
+                curr_item_index: int = 1  # initial value
+                for item in item_list:
+                    print("ITEM #" + str(curr_item_index))
+                    print(str(item) + "\n")
+                    curr_item_index += 1
+
+                item_index: int = int(input("Please enter the index of the item you want to buy (1 - " +
+                                            str(len(item_list)) + "): "))
+                while item_index < 1 or item_index > len(item_list):
+                    item_index: int = int(input("Sorry, invalid input! Please enter the index of the item you want "
+                                                "to buy (1 - " + str(len(item_list)) + "): "))
+
+                item_to_buy: Item = item_list[item_index - 1]
+                if new_game.player_data.purchase_item(item_to_buy):
+                    print("You have successfully bought " + str(item_to_buy.name))
+                else:
+                    print("Sorry, you have insufficient gold and/or gems!")
+            elif action == "BATTLE ARENA":
+                # Clearing the command line window
+                clear()
+
+                # Showing a list of CPU players the player can battle against in the arena.
+                cpu_index: int = 1
+                for opponent in new_game.battle_arena.get_potential_opponents():
+                    print("OPPONENT NUMBER #" + str(cpu_index))
+                    print(str(opponent) + "\n")
+                    cpu_index += 1
+
+                chosen_cpu_index: int = int(input("Please enter the index of the CPU player you "
+                                                  "want to attack (1 - " + str(len(new_game.battle_arena.
+                                                                                   get_potential_opponents())) +
+                                                  "): "))
+                while chosen_cpu_index < 1 or chosen_cpu_index > len(new_game.battle_arena.
+                                                                             get_potential_opponents()):
+                    chosen_cpu_index = int(input("Sorry, invalid input! Please enter the index of "
+                                                 "the CPU player you "
+                                                 "want to attack (1 - " + str(len(new_game.battle_arena.
+                                                                                  get_potential_opponents())) +
+                                                 "): "))
+
+                chosen_cpu: CPU = new_game.battle_arena.get_potential_opponents()[chosen_cpu_index - 1]
+
+                # Start the battle and battle until there is a winner
+                # Clearing up the command line window
+                clear()
+
+                print("--------------------" + str(new_game.player_data.name) + " VS. " + str(chosen_cpu.name) +
+                      "--------------------")
+                curr_battle: Battle = Battle(new_game.player_data.battle_team, chosen_cpu.battle_team)
+                while curr_battle.winner is None:
+                    # Printing out the stats of legendary creatures in both teams
+                    print("Below are the stats of all legendary creatures in player's team.\n")
+                    for legendary_creature in curr_battle.team1.get_legendary_creatures():
+                        print(str(legendary_creature) + "\n")
+
+                    print("Below are the stats of all legendary creatures in enemy's team.\n")
+                    for legendary_creature in curr_battle.team2.get_legendary_creatures():
+                        print(str(legendary_creature) + "\n")
+
+                    # Make a legendary creature move
+                    curr_battle.get_someone_to_move()
+                    assert isinstance(curr_battle.whose_turn, LegendaryCreature), "Cannot proceed with battle!"
+
+                    if not curr_battle.whose_turn.can_move:
+                        # Skip turn
+                        curr_battle.whose_turn.have_turn(curr_battle.whose_turn, None, "NORMAL HEAL")
+
+                        # Make another legendary creature move
+                        curr_battle.get_someone_to_move()
+                        assert isinstance(curr_battle.whose_turn, LegendaryCreature), \
+                            "Cannot proceed with battle!"
+
+                    # Checking which legendary creature moves
+                    if curr_battle.whose_turn in curr_battle.team1.get_legendary_creatures():
+                        moving_legendary_creature: LegendaryCreature = curr_battle.whose_turn
+                        # Asking the player what he/she wants to do
+                        print("Enter 'NORMAL ATTACK' for normal attack.")
+                        print("Enter 'NORMAL HEAL' for normal heal.")
+                        print("Enter anything else to use a skill (only applicable if you have usable skills).")
+                        usable_skills: list = [skill for skill in curr_battle.whose_turn.get_skills()
+                                               if curr_battle.whose_turn.curr_magic_points >=
+                                               skill.magic_points_cost and isinstance(skill, ActiveSkill)]
+                        possible_actions: list = ["NORMAL ATTACK", "NORMAL HEAL"]
+                        trainer_battle_action: str = input("What do you want to do? ")
+                        while len(usable_skills) == 0 and trainer_battle_action not in possible_actions:
+                            print("Enter 'NORMAL ATTACK' for normal attack.")
+                            print("Enter 'NORMAL HEAL' for normal heal.")
+                            trainer_battle_action = input("Sorry, invalid input! What do you want to do? ")
+
+                        if trainer_battle_action not in possible_actions:
+                            # Use skill
+                            trainer_battle_action = "USE SKILL"
+
+                            # Show a list of skills the player can use
+                            print("Below is a list of skills you can use.\n")
+                            curr_skill_index: int = 1  # initial value
+                            for skill in usable_skills:
+                                print("SKILL #" + str(curr_skill_index))
+                                print(str(skill) + "\n")
+                                curr_skill_index += 1
+
+                            skill_index: int = int(input("Please enter the index of the skill "
+                                                         "you want to use (1 - " +
+                                                         str(len(usable_skills)) + "): "))
+                            while skill_index < 1 or skill_index > len(usable_skills):
+                                skill_index = int(input("Sorry, invalid input! Please enter the "
+                                                        "index of the skill "
+                                                        "you want to use (1 - " +
+                                                        str(len(usable_skills)) + "): "))
+
+                            skill_to_use: ActiveSkill = usable_skills[skill_index - 1]
+                            if skill_to_use.active_skill_type == "ATTACK":
+                                # Asking the user to select a target
+                                print("Below is a list of enemies you can attack.")
+                                enemy_index: int = 1  # initial value
+                                for enemy in curr_battle.team2.get_legendary_creatures():
+                                    print("ENEMY #" + str(enemy_index))
+                                    print(str(enemy) + "\n")
+                                    enemy_index += 1
+
+                                chosen_enemy_index: int = int(input("Please enter the index of the "
+                                                                    "enemy you want to attack (1 - " +
+                                                                    str(len(curr_battle.
+                                                                            team2.get_legendary_creatures())) +
+                                                                    "): "))
+                                while chosen_enemy_index < 1 or chosen_enemy_index > len(curr_battle.
+                                                                                                 team2.get_legendary_creatures()):
+                                    chosen_enemy_index = int(input("Sorry, invalid input! "
+                                                                   "Please enter the index of the "
+                                                                   "enemy you want to attack (1 - " +
+                                                                   str(len(curr_battle.
+                                                                           team2.get_legendary_creatures())) +
+                                                                   "): "))
+
+                                chosen_enemy_target: LegendaryCreature = curr_battle.team2. \
+                                    get_legendary_creatures()[chosen_enemy_index - 1]
+                                curr_battle.whose_turn.have_turn(chosen_enemy_target, skill_to_use,
+                                                                 trainer_battle_action)
+                                if random.random() < chosen_enemy_target.counterattack_chance + \
+                                        chosen_enemy_target.counterattack_chance_up:
+                                    chosen_enemy_target.counterattack(curr_battle.whose_turn)
+
+                            elif skill_to_use.active_skill_type == "HEAL":
+                                # Asking the user to select who to heal
+                                print("Below is a list of allies you can heal.")
+                                ally_index: int = 1  # initial value
+                                for ally in curr_battle.team1.get_legendary_creatures():
+                                    print("ALLY #" + str(ally_index))
+                                    print(str(ally) + "\n")
+                                    ally_index += 1
+
+                                chosen_ally_index: int = int(input("Please enter the index of the "
+                                                                   "ally you want to heal (1 - " +
+                                                                   str(len(curr_battle.
+                                                                           team1.get_legendary_creatures())) +
+                                                                   "): "))
+                                while chosen_ally_index < 1 or chosen_ally_index > len(curr_battle.
+                                                                                               team1.get_legendary_creatures()):
+                                    chosen_ally_index = int(input("Sorry, invalid input! "
+                                                                  "Please enter the index of the "
+                                                                  "ally you want to heal (1 - " +
+                                                                  str(len(curr_battle.
+                                                                          team1.get_legendary_creatures())) +
+                                                                  "): "))
+
+                                chosen_ally_target: LegendaryCreature = curr_battle.team1. \
+                                    get_legendary_creatures()[chosen_ally_index - 1]
+                                curr_battle.whose_turn.have_turn(chosen_ally_target, skill_to_use,
+                                                                 trainer_battle_action)
+                            elif skill_to_use.active_skill_type == "ALLIES EFFECT":
+                                # Asking the user to select who to apply ally effect on
+                                print("Below is a list of allies you can apply ally effect on.")
+                                ally_index: int = 1  # initial value
+                                for ally in curr_battle.team1.get_legendary_creatures():
+                                    print("ALLY #" + str(ally_index))
+                                    print(str(ally) + "\n")
+                                    ally_index += 1
+
+                                chosen_ally_index: int = int(input("Please enter the index of the "
+                                                                   "ally you want to apply ally effect on (1 - " +
+                                                                   str(len(curr_battle.
+                                                                           team1.get_legendary_creatures())) +
+                                                                   "): "))
+                                while chosen_ally_index < 1 or chosen_ally_index > len(curr_battle.
+                                                                                               team1.get_legendary_creatures()):
+                                    chosen_ally_index = int(input("Sorry, invalid input! "
+                                                                  "Please enter the index of the "
+                                                                  "ally you want to apply ally effect on (1 - " +
+                                                                  str(len(curr_battle.
+                                                                          team1.get_legendary_creatures())) +
+                                                                  "): "))
+
+                                chosen_ally_target: LegendaryCreature = curr_battle.team1. \
+                                    get_legendary_creatures()[chosen_ally_index - 1]
+                                curr_battle.whose_turn.have_turn(chosen_ally_target, skill_to_use,
+                                                                 trainer_battle_action)
+                            elif skill_to_use.active_skill_type == "ENEMIES EFFECT":
+                                # Asking the user to select who to apply enemy effect on
+                                print("Below is a list of enemies you can apply enemy effect on.")
+                                enemy_index: int = 1  # initial value
+                                for enemy in curr_battle.team2.get_legendary_creatures():
+                                    print("ENEMY #" + str(enemy_index))
+                                    print(str(enemy) + "\n")
+                                    enemy_index += 1
+
+                                chosen_enemy_index: int = int(input("Please enter the index of the "
+                                                                    "enemy you want to apply enemy effect on"
+                                                                    " (1 - " +
+                                                                    str(len(curr_battle.
+                                                                            team2.get_legendary_creatures())) +
+                                                                    "): "))
+                                while chosen_enemy_index < 1 or chosen_enemy_index > len(curr_battle.
+                                                                                                 team2.get_legendary_creatures()):
+                                    chosen_enemy_index = int(input("Sorry, invalid input! "
+                                                                   "Please enter the index of the "
+                                                                   "enemy you want to apply enemy effect on"
+                                                                   " (1 - " +
+                                                                   str(len(curr_battle.
+                                                                           team2.get_legendary_creatures())) +
+                                                                   "): "))
+
+                                chosen_enemy_target: LegendaryCreature = curr_battle.team2. \
+                                    get_legendary_creatures()[chosen_enemy_index - 1]
+                                curr_battle.whose_turn.have_turn(chosen_enemy_target, skill_to_use,
+                                                                 trainer_battle_action)
+
+                        elif trainer_battle_action == "NORMAL ATTACK":
+                            # Asking the user to select a target
+                            print("Below is a list of enemies you can attack.")
+                            enemy_index: int = 1  # initial value
+                            for enemy in curr_battle.team2.get_legendary_creatures():
+                                print("ENEMY #" + str(enemy_index))
+                                print(str(enemy) + "\n")
+                                enemy_index += 1
+
+                            chosen_enemy_index: int = int(input("Please enter the index of the "
+                                                                "enemy you want to attack (1 - " +
+                                                                str(len(curr_battle.
+                                                                        team2.get_legendary_creatures())) +
+                                                                "): "))
+                            while chosen_enemy_index < 1 or chosen_enemy_index > len(curr_battle.
+                                                                                             team2.get_legendary_creatures()):
+                                chosen_enemy_index = int(input("Sorry, invalid input! "
+                                                               "Please enter the index of the "
+                                                               "enemy you want to attack (1 - " +
+                                                               str(len(curr_battle.
+                                                                       team2.get_legendary_creatures())) +
+                                                               "): "))
+
+                            chosen_enemy_target: LegendaryCreature = curr_battle.team2. \
+                                get_legendary_creatures()[chosen_enemy_index - 1]
+                            curr_battle.whose_turn.have_turn(chosen_enemy_target, None, trainer_battle_action)
+                            if random.random() < chosen_enemy_target.counterattack_chance + \
+                                    chosen_enemy_target.counterattack_chance_up:
+                                chosen_enemy_target.counterattack(curr_battle.whose_turn)
+
+                        elif trainer_battle_action == "NORMAL HEAL":
+                            # Asking the user to select who to heal
+                            print("Below is a list of allies you can heal.")
+                            ally_index: int = 1  # initial value
+                            for ally in curr_battle.team1.get_legendary_creatures():
+                                print("ALLY #" + str(ally_index))
+                                print(str(ally) + "\n")
+                                ally_index += 1
+
+                            chosen_ally_index: int = int(input("Please enter the index of the "
+                                                               "ally you want to heal (1 - " +
+                                                               str(len(curr_battle.
+                                                                       team1.get_legendary_creatures())) +
+                                                               "): "))
+                            while chosen_ally_index < 1 or chosen_ally_index > len(curr_battle.
+                                                                                           team1.get_legendary_creatures()):
+                                chosen_ally_index = int(input("Sorry, invalid input! "
+                                                              "Please enter the index of the "
+                                                              "ally you want to heal (1 - " +
+                                                              str(len(curr_battle.
+                                                                      team1.get_legendary_creatures())) +
+                                                              "): "))
+
+                            chosen_ally_target: LegendaryCreature = curr_battle.team1. \
+                                get_legendary_creatures()[chosen_ally_index - 1]
+                            curr_battle.whose_turn.have_turn(chosen_ally_target, None,
+                                                             trainer_battle_action)
+                        else:
+                            pass
+
+                        # Checking the case where the moving legendary creature gets an extra turn
+                        if random.random() < moving_legendary_creature.extra_turn_chance + \
+                                moving_legendary_creature.extra_turn_chance_up and \
+                                moving_legendary_creature.can_move:
+                            curr_battle.whose_turn = moving_legendary_creature
+
+                            # Recovering magic points
+                            curr_battle.whose_turn.recover_magic_points()
+                        else:
+                            curr_battle.get_someone_to_move()
+
+                    elif curr_battle.whose_turn in curr_battle.team2.get_legendary_creatures():
+                        curr_moving_legendary_creature: LegendaryCreature = curr_battle.whose_turn
+                        chance: float = random.random()
+                        trainer_battle_action: str = "NORMAL ATTACK" if chance <= 1 / 3 else \
+                            "NORMAL HEAL" if 1 / 3 < chance <= 2 / 3 else "USE SKILL"
+                        usable_skills: list = [skill for skill in curr_battle.whose_turn.get_skills()
+                                               if curr_battle.whose_turn.curr_magic_points >=
+                                               skill.magic_points_cost and isinstance(skill, ActiveSkill)]
+
+                        # If there are no usable skills and 'trainer_battle_action' is set to "USE SKILL",
+                        # change the value of 'trainer_battle_action'
+                        if len(usable_skills) == 0:
+                            trainer_battle_action = "NORMAL ATTACK" if random.random() < 0.5 else "NORMAL HEAL"
+
+                        if trainer_battle_action == "NORMAL ATTACK":
+                            # A normal attack occurs
+                            moving_legendary_creature: LegendaryCreature = curr_battle.whose_turn
+                            target: LegendaryCreature = curr_battle.team1.get_legendary_creatures() \
+                                [random.randint(0, len(curr_battle.team1.get_legendary_creatures()) - 1)]
+                            moving_legendary_creature.have_turn(target, None, trainer_battle_action)
+                            if random.random() < target.counterattack_chance + \
+                                    target.counterattack_chance_up:
+                                target.counterattack(moving_legendary_creature)
+                        elif trainer_battle_action == "NORMAL HEAL":
+                            # A normal heal occurs
+                            moving_legendary_creature: LegendaryCreature = curr_battle.whose_turn
+                            target: LegendaryCreature = curr_battle.team2.get_legendary_creatures() \
+                                [random.randint(0, len(curr_battle.team2.get_legendary_creatures()) - 1)]
+                            moving_legendary_creature.have_turn(target, None, trainer_battle_action)
+                        elif trainer_battle_action == "USE SKILL":
+                            # A skill is used
+                            moving_legendary_creature: LegendaryCreature = curr_battle.whose_turn
+                            skill_to_use: ActiveSkill = usable_skills[random.randint(0, len(usable_skills) - 1)]
+                            if skill_to_use.active_skill_type == "ATTACK" or \
+                                    skill_to_use.active_skill_type == "ENEMIES EFFECT":
+                                target: LegendaryCreature = curr_battle.team1.get_legendary_creatures() \
+                                    [random.randint(0, len(curr_battle.team1.get_legendary_creatures()) - 1)]
+                                moving_legendary_creature.have_turn(target, skill_to_use, trainer_battle_action)
+                                if skill_to_use.active_skill_type == "ATTACK":
+                                    if random.random() < target.counterattack_chance + \
+                                            target.counterattack_chance_up:
+                                        target.counterattack(moving_legendary_creature)
+                            else:
+                                target: LegendaryCreature = curr_battle.team2.get_legendary_creatures() \
+                                    [random.randint(0, len(curr_battle.team2.get_legendary_creatures()) - 1)]
+                                moving_legendary_creature.have_turn(target, skill_to_use, trainer_battle_action)
+                        else:
+                            pass
+
+                        # Checking the case where the moving legendary creature gets an extra turn
+                        if random.random() < curr_moving_legendary_creature.extra_turn_chance + \
+                                curr_moving_legendary_creature.extra_turn_chance_up and \
+                                curr_moving_legendary_creature.can_move:
+                            curr_battle.whose_turn = curr_moving_legendary_creature
+
+                            # Recovering magic points
+                            curr_battle.whose_turn.recover_magic_points()
+                        else:
+                            curr_battle.get_someone_to_move()
+
+                    # Recovering magic points
+                    curr_battle.whose_turn.recover_magic_points()
+
+                if curr_battle.winner == curr_battle.team1:
+                    print("Congratulations! You won the battle!")
+                    new_game.player_data.claim_reward(curr_battle.reward)
+                    new_game.player_data.arena_wins += 1
+                    chosen_cpu.arena_losses += 1
+                    chosen_cpu.times_beaten += 1
+                    chosen_cpu.strengthen()
+                    if new_game.player_data.arena_points > chosen_cpu.arena_points:
+                        new_game.player_data.arena_points += 5
+                        chosen_cpu.arena_points -= 2
+                    else:
+                        new_game.player_data.arena_points += 10
+                        chosen_cpu.arena_points -= 5
+
+                elif curr_battle.winner == curr_battle.team2:
+                    print("You lost the battle! Please come back stronger!")
+                    new_game.player_data.arena_losses += 1
+                    chosen_cpu.arena_wins += 1
+                    if new_game.player_data.arena_points > chosen_cpu.arena_points:
+                        new_game.player_data.arena_points -= 5
+                        chosen_cpu.arena_points += 10
+                    else:
+                        new_game.player_data.arena_points -= 2
+                        chosen_cpu.arena_points += 5
+
+                # Restore all legendary creatures
+                curr_battle.team1.recover_all()
+                curr_battle.team2.recover_all()
+
+            elif action == "MULTIPLAYER BATTLE":
+                # Clearing the command line window
+                clear()
+
+                # TODO: add code for multiplayer battle
+            elif action == "PLAY MINIGAME":
+                # Clearing the command line window
+                clear()
+
+                print("Below is a list of minigames you can play.\n")
+                curr_minigame_index: int = 1  # initial value
+                for minigame in new_game.get_minigames():
+                    print("MINIGAME #" + str(curr_minigame_index))
+                    print(str(minigame) + "\n")
+                    curr_minigame_index += 1
+
+                minigame_index: int = int(input("Please enter the index of the minigame you want to play (1 - " +
+                                                str(len(new_game.get_minigames())) + "): "))
+                while minigame_index < 1 or minigame_index > len(new_game.get_minigames()):
+                    minigame_index = int(input("Sorry, invalid input! Please enter the index of the minigame "
+                                               "you want to play (1 - " +
+                                               str(len(new_game.get_minigames())) + "): "))
+
+                chosen_minigame: Minigame = new_game.get_minigames()[minigame_index - 1]
+
+                # TODO: add code to play chosen minigame
+            elif action == "REMOVE RUNE":
+                # Clearing up the command line window
+                clear()
+
+                # Allow the player to remove a rune if there are legendary creatures in the legendary creature
+                # inventory.
+                if len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()) > 0:
+                    print("Below is a list of legendary creatures you have.\n")
+                    curr_legendary_creature_index: int = 1  # initial value
+                    for legendary_creature in new_game.player_data.legendary_creature_inventory.get_legendary_creatures():
+                        print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                        print(str(legendary_creature) + "\n")
+                        curr_legendary_creature_index += 1
+
+                    legendary_creature_index: int = int(input("Please enter the index of the legendary creature "
+                                                              "you want to remove a rune from (1 - " +
+                                                              str(len(new_game.player_data.legendary_creature_inventory.
+                                                                      get_legendary_creatures())) + "): "))
+                    while legendary_creature_index < 1 or legendary_creature_index > \
+                            len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()):
+                        legendary_creature_index = int(input("Sorry, invalid input! Please enter the index of the "
+                                                             "legendary creature you want to remove a rune from "
+                                                             "(1 - " +
+                                                             str(len(new_game.player_data.legendary_creature_inventory.
+                                                                     get_legendary_creatures())) + "): "))
+
+                    chosen_legendary_creature: LegendaryCreature = \
+                        new_game.player_data.legendary_creature_inventory.get_legendary_creatures() \
+                            [legendary_creature_index - 1]
+                    print(str(chosen_legendary_creature.name) + " has runes placed in slots as below.")
+                    for i in chosen_legendary_creature.get_runes().keys():
+                        print("SLOT NUMBER #" + str(i))
+
+                    slot_number: int = int(input("Please enter the slot number of the rune you want to remove "
+                                                 "(1 - 6): "))
+                    while slot_number < 1 or slot_number > 6:
+                        slot_number = int(
+                            input("Sorry, invalid input! Please enter the slot number of the rune you want to "
+                                  "remove (1 - 6): "))
+
+                    chosen_legendary_creature.remove_rune(slot_number)
+
+            elif action == "PLACE RUNE":
+                # Clearing up the command line window
+                clear()
+
+                # Allow the player to place a rune if there are legendary creatures in the legendary creature
+                # inventory.
+                if len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()) > 0:
+                    print("Below is a list of legendary creatures you have.\n")
+                    curr_legendary_creature_index: int = 1  # initial value
+                    for legendary_creature in new_game.player_data.legendary_creature_inventory.get_legendary_creatures():
+                        print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                        print(str(legendary_creature) + "\n")
+                        curr_legendary_creature_index += 1
+
+                    legendary_creature_index: int = int(input("Please enter the index of the legendary creature "
+                                                              "you want to place a rune on (1 - " +
+                                                              str(len(new_game.player_data.legendary_creature_inventory.
+                                                                      get_legendary_creatures())) + "): "))
+                    while legendary_creature_index < 1 or legendary_creature_index > \
+                            len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()):
+                        legendary_creature_index = int(input("Sorry, invalid input! Please enter the index of the "
+                                                             "legendary creature you want to place a rune on "
+                                                             "(1 - " +
+                                                             str(len(new_game.player_data.legendary_creature_inventory.
+                                                                     get_legendary_creatures())) + "): "))
+
+                    chosen_legendary_creature: LegendaryCreature = \
+                        new_game.player_data.legendary_creature_inventory.get_legendary_creatures() \
+                            [legendary_creature_index - 1]
+
+                    # Getting a list of runes which can be placed to the legendary creature
+                    runes: list = []  # initial value
+                    for item in new_game.player_data.item_inventory.get_items():
+                        if isinstance(item, Rune):
+                            if not item.already_placed:
+                                runes.append(item)
+
+                    print("Enter 'Y' for yes.")
+                    print("Enter anything else for no.")
+                    place_rune: str = input(
+                        "Do you want to place a rune to " + str(chosen_legendary_creature.name) + "? ")
+                    if place_rune == "Y":
+                        if len(runes) > 0:
+                            print("Below is a list of runes you have.\n")
+                            curr_rune_index: int = 1  # initial value
+                            for rune in runes:
+                                print("RUNE #" + str(curr_rune_index))
+                                print(str(rune) + "\n")
+                                curr_rune_index += 1
+
+                            rune_index: int = int(input("Please enter the index of the rune you want to place to "
+                                                        "this legendary creature (1 - " + str(len(runes)) + "): "))
+                            while rune_index < 1 or rune_index > len(runes):
+                                rune_index = int(input(
+                                    "Sorry, invalid input! Please enter the index of the rune you want to place to "
+                                    "this legendary creature (1 - " + str(len(runes)) + "): "))
+
+                            chosen_rune: Rune = runes[rune_index - 1]
+                            chosen_legendary_creature.place_rune(chosen_rune)
+
+            elif action == "MANAGE TRAINING AREA":
+                # Clearing up the command line window
+                clear()
+
+                # Getting a list of training areas in the player's city
+                training_areas: list = []  # initial value
+                for section in new_game.player_data.player_city.get_sections():
+                    for x in range(section.SECTION_WIDTH):
+                        for y in range(section.SECTION_HEIGHT):
+                            curr_tile: CityTile = section.get_tile_at(x, y)
+                            if isinstance(curr_tile.building, TrainingArea):
+                                training_areas.append(curr_tile.building)
+
+                # If there are training areas, ask the player which training area he/she wants to manage.
+                if len(training_areas) > 0:
+                    print("Below is a list of training areas that you have.\n")
+                    curr_training_area_index: int = 1  # initial value
+                    for training_area in training_areas:
+                        print("TRAINING AREA #" + str(curr_training_area_index))
+                        print(str(training_area) + "\n")
+                        curr_training_area_index += 1
+
+                    training_area_index: int = int(input("Please enter the index of the training area you want to "
+                                                         "manage (1 - " + str(len(training_areas)) + "): "))
+                    while training_area_index < 1 or training_area_index > len(training_areas):
+                        training_area_index = int(input("Sorry, invalid input! Please enter the index of the training "
+                                                        "area "
+                                                        "you want to manage (1 - " + str(len(training_areas)) + "): "))
+
+                    chosen_training_area: TrainingArea = training_areas[training_area_index - 1]
+
+                    # Checking whether a legendary creature can be added to the chosen training area or not.
+                    if len(chosen_training_area.get_legendary_creatures_placed()) < \
+                            chosen_training_area.MAX_LEGENDARY_CREATURES:
+                        # Printing a list of legendary creatures the player can add to the training area
+                        available_legendary_creatures: list = []  # initial value
+                        for legendary_creature in new_game.player_data.legendary_creature_inventory.get_legendary_creatures():
+                            if legendary_creature not in new_game.player_data.battle_team.get_legendary_creatures() and \
+                                    not legendary_creature.placed_in_training_area and not \
+                                    legendary_creature.placed_in_habitat:
+                                available_legendary_creatures.append(legendary_creature)
+
+                        if len(available_legendary_creatures) > 0:
+                            print("Enter 'Y' for yes.")
+                            print("Enter anything else for no.")
+                            add_legendary_creature: str = input("Do you want to add a legendary creature to the "
+                                                                "training area? ")
+                            if add_legendary_creature == "Y":
+                                print(
+                                    "Below is a list of legendary creatures which you can add to the training area.\n")
+                                curr_legendary_creature_index: int = 1  # initial value
+                                for legendary_creature in available_legendary_creatures:
+                                    print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                                    print(str(legendary_creature) + "\n")
+                                    curr_legendary_creature_index += 1
+
+                                legendary_creature_index: int = int(
+                                    input("Please enter the index of the legendary creature "
+                                          "you want to add to the training area (1 - " +
+                                          str(len(available_legendary_creatures)) + "): "))
+                                while legendary_creature_index < 1 or legendary_creature_index > \
+                                        len(available_legendary_creatures):
+                                    legendary_creature_index = int(
+                                        input("Sorry, invalid input! Please enter the index of the "
+                                              "legendary creature you want to add to the training "
+                                              "area (1 - " +
+                                              str(len(available_legendary_creatures)) + "): "))
+
+                                legendary_creature_to_add: LegendaryCreature = \
+                                    available_legendary_creatures[legendary_creature_index - 1]
+                                new_game.player_data.add_legendary_creature_to_training_area(legendary_creature_to_add,
+                                                                                             chosen_training_area)
+
+                    # Checking whether a legendary creature can be removed from the chosen training area or not.
+                    if len(chosen_training_area.get_legendary_creatures_placed()) > 0:
+                        print("Enter 'Y' for yes.")
+                        print("Enter anything else for no.")
+                        remove_legendary_creature: str = input("Do you want to remove a legendary creature from the "
+                                                               "training area? ")
+                        if remove_legendary_creature == "Y":
+                            # Printing a list of legendary creatures in the chosen training area
+                            curr_legendary_creature_index: int = 1
+                            for legendary_creature in chosen_training_area.get_legendary_creatures_placed():
+                                print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                                print(str(legendary_creature) + "\n")
+                                curr_legendary_creature_index += 1
+
+                            legendary_creature_index: int = int(input("Please enter the index of the legendary "
+                                                                      "creature "
+                                                                      "you want to remove from the training area (1 - " +
+                                                                      str(len(chosen_training_area.
+                                                                              get_legendary_creatures_placed())) + "): "))
+                            while legendary_creature_index < 1 or legendary_creature_index > \
+                                    len(chosen_training_area.get_legendary_creatures_placed()):
+                                legendary_creature_index = int(input("Sorry, invalid input! Please enter the index of "
+                                                                     "the "
+                                                                     "legendary creature "
+                                                                     "you want to remove from the training area (1 - " +
+                                                                     str(len(chosen_training_area.
+                                                                             get_legendary_creatures_placed())) + "): "))
+
+                            legendary_creature_to_remove: LegendaryCreature = \
+                                chosen_training_area.get_legendary_creatures_placed()[legendary_creature_index - 1]
+                            new_game.player_data.remove_legendary_creature_from_training_area \
+                                (legendary_creature_to_remove, chosen_training_area)
+
+            elif action == "MANAGE HABITAT":
+                # Clearing up the command line window
+                clear()
+
+                # Getting a list of habitats in the player's city
+                habitats: list = []  # initial value
+                for section in new_game.player_data.player_city.get_sections():
+                    for x in range(section.SECTION_WIDTH):
+                        for y in range(section.SECTION_HEIGHT):
+                            curr_tile: CityTile = section.get_tile_at(x, y)
+                            if isinstance(curr_tile.building, Habitat):
+                                habitats.append(curr_tile.building)
+
+                # If there are habitats, ask the player which training area he/she wants to manage.
+                if len(habitats) > 0:
+                    print("Below is a list of habitats that you have.\n")
+                    curr_habitat_index: int = 1
+                    for habitat in habitats:
+                        print("HABITAT #" + str(curr_habitat_index))
+                        print(str(habitat) + "\n")
+                        curr_habitat_index += 1
+
+                    chosen_habitat_index: int = int(input("Please enter the index of the habitat you want "
+                                                          "to manage (1 - " + str(len(habitats)) + "): "))
+                    while chosen_habitat_index < 1 or chosen_habitat_index > len(habitats):
+                        chosen_habitat_index = int(input("Sorry, invalid input! Please enter the index of the "
+                                                         "habitat you want "
+                                                         "to manage (1 - " + str(len(habitats)) + "): "))
+
+                    chosen_habitat: Habitat = habitats[chosen_habitat_index - 1]
+
+                    # Checking whether legendary creatures can be added to the chosen habitat or not.
+                    if len(chosen_habitat.get_legendary_creatures_placed()) < chosen_habitat.MAX_LEGENDARY_CREATURES:
+                        # Printing a list of legendary creatures the player can add to the habitat
+                        available_legendary_creatures: list = []  # initial value
+                        for legendary_creature in new_game.player_data.legendary_creature_inventory.get_legendary_creatures():
+                            if legendary_creature not in new_game.player_data.battle_team.get_legendary_creatures() and \
+                                    not legendary_creature.placed_in_training_area and not \
+                                    legendary_creature.placed_in_habitat and chosen_habitat.element in \
+                                    legendary_creature.get_elements():
+                                available_legendary_creatures.append(legendary_creature)
+
+                        if len(available_legendary_creatures) > 0:
+                            print("Enter 'Y' for yes.")
+                            print("Enter anything else for no.")
+                            add_legendary_creature: str = input("Do you want to add a legendary creature to the "
+                                                                "habitat? ")
+                            if add_legendary_creature == "Y":
+                                print("Below is a list of legendary creatures which you can add to the habitat.\n")
+                                curr_legendary_creature_index: int = 1  # initial value
+                                for legendary_creature in available_legendary_creatures:
+                                    print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                                    print(str(legendary_creature) + "\n")
+                                    curr_legendary_creature_index += 1
+
+                                legendary_creature_index: int = int(input("Please enter the index of the "
+                                                                          "legendary creature you want to "
+                                                                          "add to the habitat (1 - " +
+                                                                          str(len(available_legendary_creatures)) +
+                                                                          "): "))
+                                while legendary_creature_index < 1 or legendary_creature_index > \
+                                        len(available_legendary_creatures):
+                                    legendary_creature_index = int(input("Sorry, invalid input! "
+                                                                         "Please enter the index of the "
+                                                                         "legendary creature you want to "
+                                                                         "add to the habitat (1 - " +
+                                                                         str(len(available_legendary_creatures)) +
+                                                                         "): "))
+
+                                legendary_creature_to_add: LegendaryCreature = \
+                                    available_legendary_creatures[legendary_creature_index - 1]
+                                new_game.player_data.add_legendary_creature_to_habitat(legendary_creature_to_add,
+                                                                                       chosen_habitat)
+
+                    # Checking whether a legendary creature can be removed from the chosen habitat or not.
+                    if len(chosen_habitat.get_legendary_creatures_placed()) > 0:
+                        print("Enter 'Y' for yes.")
+                        print("Enter anything else for no.")
+                        remove_legendary_creature: str = input("Do you want to remove a legendary creature from the "
+                                                               "habitat? ")
+                        if remove_legendary_creature == "Y":
+                            # Printing a list of legendary creatures in the chosen habitat
+                            curr_legendary_creature_index: int = 1
+                            for legendary_creature in chosen_habitat.get_legendary_creatures_placed():
+                                print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                                print(str(legendary_creature) + "\n")
+                                curr_legendary_creature_index += 1
+
+                            legendary_creature_index: int = int(input("Please enter the index of the legendary "
+                                                                      "creature "
+                                                                      "you want to remove from the habitat (1 - " +
+                                                                      str(len(chosen_habitat.
+                                                                              get_legendary_creatures_placed())) + "): "))
+                            while legendary_creature_index < 1 or legendary_creature_index > \
+                                    len(chosen_habitat.get_legendary_creatures_placed()):
+                                legendary_creature_index = int(input("Sorry, invalid input! Please enter the index of "
+                                                                     "the "
+                                                                     "legendary creature "
+                                                                     "you want to remove from the habitat (1 - " +
+                                                                     str(len(chosen_habitat.
+                                                                             get_legendary_creatures_placed())) + "): "))
+
+                            legendary_creature_to_remove: LegendaryCreature = \
+                                chosen_habitat.get_legendary_creatures_placed()[legendary_creature_index - 1]
+                            new_game.player_data.remove_legendary_creature_from_habitat \
+                                (legendary_creature_to_remove, chosen_habitat)
+
+            elif action == "EVOLVE LEGENDARY CREATURE":
+                # Clearing up the command line window
+                clear()
+
+                # Getting a list of power-up circles in the player's city
+                power_up_circles: list = []  # initial value
+                for section in new_game.player_data.player_city.get_sections():
+                    for x in range(section.SECTION_WIDTH):
+                        for y in range(section.SECTION_HEIGHT):
+                            curr_tile: CityTile = section.get_tile_at(x, y)
+                            if isinstance(curr_tile.building, PowerUpCircle):
+                                power_up_circles.append(curr_tile.building)
+
+                # If there are power up circles, ask the player which power-up circle he/she wants to use
+                if len(power_up_circles) > 0:
+                    print("Below is a list of power up circles that you have.\n")
+                    curr_power_up_circle_index: int = 1  # initial value
+                    for power_up_circle in power_up_circles:
+                        print("POWER UP CIRCLE #" + str(curr_power_up_circle_index))
+                        print(str(power_up_circle) + "\n")
+                        curr_power_up_circle_index += 1
+
+                    power_up_circle_index: int = int(input("Please enter the index of the power-up circle you want to "
+                                                           "use (1 - " + str(len(power_up_circles)) + "): "))
+                    while power_up_circle_index < 1 or power_up_circle_index > len(power_up_circles):
+                        power_up_circle_index = int(
+                            input("Sorry, invalid input! Please enter the index of the power-up circle you want to "
+                                  "use (1 - " + str(len(power_up_circles)) + "): "))
+
+                    chosen_power_up_circle: PowerUpCircle = power_up_circles[power_up_circle_index - 1]
+
+                    # Ask the player to choose the legendary creature to be evolved and the materials used if
+                    # possible
+                    if len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()) > 0:
+                        # Printing all the legendary creatures the player has.
+                        for legendary_creature in \
+                                new_game.player_data.legendary_creature_inventory.get_legendary_creatures():
+                            print(str(legendary_creature) + "\n")
+
+                        # Ask the player to choose the legendary creature to be evolved
+                        to_be_evolved_index: int = int(input("Please enter the index of the legendary creature "
+                                                             "you want to evolve (1 - " +
+                                                             str(len(new_game.
+                                                                     player_data.legendary_creature_inventory.get_legendary_creatures())) +
+                                                             "): "))
+                        while to_be_evolved_index < 1 or to_be_evolved_index > \
+                                len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()):
+                            to_be_evolved_index = int(
+                                input("Sorry, invalid input! Please enter the index of the legendary creature "
+                                      "you want to evolve (1 - " +
+                                      str(len(new_game.
+                                              player_data.legendary_creature_inventory.get_legendary_creatures())) +
+                                      "): "))
+
+                        to_be_evolved: LegendaryCreature = new_game.player_data.legendary_creature_inventory. \
+                            get_legendary_creatures()[to_be_evolved_index - 1]
+
+                        materials_to_use: list = []
+                        num_materials: int = int(input("How many material legendary creatures do you want to place "
+                                                       "(0-" +
+                                                       str(min(5,
+                                                               len(new_game.player_data.legendary_creature_inventory.
+                                                                   get_legendary_creatures()))) +
+                                                       "_: "))
+
+                        while num_materials < 0 or num_materials > 5 or num_materials > \
+                                len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()) - 1:
+                            num_materials = int(input("Sorry, invalid input! How many material legendary creatures do "
+                                                      "you want to place "
+                                                      "(0-" +
+                                                      str(min(5,
+                                                              len(new_game.player_data.legendary_creature_inventory.
+                                                                  get_legendary_creatures()))) +
+                                                      "_: "))
+
+                        legendary_creature_options: list = new_game.player_data.legendary_creature_inventory. \
+                            get_legendary_creatures()
+                        legendary_creature_options.remove(to_be_evolved)
+                        for i in range(num_materials):
+                            print("Below is a list of legendary creatures you can choose as a material.\n")
+                            curr_legendary_creature_index: int = 1  # initial value
+                            for legendary_creature in legendary_creature_options:
+                                print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                                print(str(legendary_creature) + "\n")
+                                curr_legendary_creature_index += 1
+
+                            chosen_legendary_creature_index: int = int(input("Please enter the index of the legendary "
+                                                                             "creature you want to use as a material "
+                                                                             "(1 - " +
+                                                                             str(len(legendary_creature_options)) +
+                                                                             ": "))
+                            while chosen_legendary_creature_index < 1 or chosen_legendary_creature_index > \
+                                    len(legendary_creature_options):
+                                chosen_legendary_creature_index = int(
+                                    input("Sorry, invalid input! Please enter the index of the legendary "
+                                          "creature you want to use as a material "
+                                          "(1 - " +
+                                          str(len(legendary_creature_options)) +
+                                          ": "))
+
+                            chosen_material: LegendaryCreature = legendary_creature_options \
+                                [chosen_legendary_creature_index - 1]
+                            materials_to_use.append(chosen_material)
+                            legendary_creature_options.remove(chosen_material)
+
+                        new_game.player_data.evolve_legendary_creature(to_be_evolved, materials_to_use,
+                                                                       chosen_power_up_circle)
+
+            elif action == "POWER UP LEGENDARY CREATURE":
+                # Clearing up the command line window
+                clear()
+
+                # Getting a list of power-up circles in the player's city
+                power_up_circles: list = []  # initial value
+                for section in new_game.player_data.player_city.get_sections():
+                    for x in range(section.SECTION_WIDTH):
+                        for y in range(section.SECTION_HEIGHT):
+                            curr_tile: CityTile = section.get_tile_at(x, y)
+                            if isinstance(curr_tile.building, PowerUpCircle):
+                                power_up_circles.append(curr_tile.building)
+
+                # If there are power up circles, ask the player which power-up circle he/she wants to use
+                if len(power_up_circles) > 0:
+                    print("Below is a list of power up circles that you have.")
+                    curr_power_up_circle_index: int = 1  # initial value
+                    for power_up_circle in power_up_circles:
+                        print("POWER UP CIRCLE #" + str(curr_power_up_circle_index))
+                        print(str(power_up_circle) + "\n")
+                        curr_power_up_circle_index += 1
+
+                    power_up_circle_index: int = int(input("Please enter the index of the power-up circle you want to "
+                                                           "use (1 - " + str(len(power_up_circles)) + "): "))
+                    while power_up_circle_index < 1 or power_up_circle_index > len(power_up_circles):
+                        power_up_circle_index = int(
+                            input("Sorry, invalid input! Please enter the index of the power-up circle you want to "
+                                  "use (1 - " + str(len(power_up_circles)) + "): "))
+
+                    chosen_power_up_circle: PowerUpCircle = power_up_circles[power_up_circle_index - 1]
+
+                    # Ask the player to choose the legendary creature to be powered up and the materials used if
+                    # possible
+                    if len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()) > 0:
+                        # Printing all the legendary creatures the player has.
+                        curr_legendary_creature_index: int = 1  # initial value
+                        for legendary_creature in \
+                                new_game.player_data.legendary_creature_inventory.get_legendary_creatures():
+                            print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                            print(str(legendary_creature) + "\n")
+                            curr_legendary_creature_index += 1
+
+                        # Ask the player to choose the legendary creature to be powered up
+                        to_be_powered_up_index: int = int(input("Please enter the index of the legendary creature "
+                                                                "you want to power-up (1 - " +
+                                                                str(len(new_game.
+                                                                        player_data.legendary_creature_inventory.get_legendary_creatures())) +
+                                                                "): "))
+                        while to_be_powered_up_index < 1 or to_be_powered_up_index > \
+                                len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()):
+                            to_be_powered_up_index = int(
+                                input("Sorry, invalid input! Please enter the index of the legendary creature "
+                                      "you want to power-up (1 - " +
+                                      str(len(new_game.
+                                              player_data.legendary_creature_inventory.get_legendary_creatures())) +
+                                      "): "))
+
+                        to_be_powered_up: LegendaryCreature = new_game.player_data.legendary_creature_inventory. \
+                            get_legendary_creatures()[to_be_powered_up_index - 1]
+
+                        materials_to_use: list = []
+                        num_materials: int = int(input("How many material legendary creatures do you want to place "
+                                                       "(0-" +
+                                                       str(min(5,
+                                                               len(new_game.player_data.legendary_creature_inventory.
+                                                                   get_legendary_creatures()))) +
+                                                       "_: "))
+
+                        while num_materials < 0 or num_materials > 5 or num_materials > \
+                                len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()) - 1:
+                            num_materials = int(input("Sorry, invalid input! How many material legendary creatures do "
+                                                      "you want to place "
+                                                      "(0-" +
+                                                      str(min(5,
+                                                              len(new_game.player_data.legendary_creature_inventory.
+                                                                  get_legendary_creatures()))) +
+                                                      "_: "))
+
+                        legendary_creature_options: list = new_game.player_data.legendary_creature_inventory. \
+                            get_legendary_creatures()
+                        legendary_creature_options.remove(to_be_powered_up)
+                        for i in range(num_materials):
+                            print("Below is a list of legendary creatures you can choose as a material.\n")
+                            curr_legendary_creature_index: int = 1  # initial value
+                            for legendary_creature in legendary_creature_options:
+                                print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                                print(str(legendary_creature) + "\n")
+                                curr_legendary_creature_index += 1
+
+                            chosen_legendary_creature_index: int = int(input("Please enter the index of the legendary "
+                                                                             "creature you want to use as a material "
+                                                                             "(1 - " +
+                                                                             str(len(legendary_creature_options)) +
+                                                                             ": "))
+                            while chosen_legendary_creature_index < 1 or chosen_legendary_creature_index > \
+                                    len(legendary_creature_options):
+                                chosen_legendary_creature_index = int(
+                                    input("Sorry, invalid input! Please enter the index of the legendary "
+                                          "creature you want to use as a material "
+                                          "(1 - " +
+                                          str(len(legendary_creature_options)) +
+                                          ": "))
+
+                            chosen_material: LegendaryCreature = legendary_creature_options \
+                                [chosen_legendary_creature_index - 1]
+                            materials_to_use.append(chosen_material)
+                            legendary_creature_options.remove(chosen_material)
+
+                        new_game.player_data.power_up_legendary_creature(to_be_powered_up, materials_to_use,
+                                                                         chosen_power_up_circle)
+
+            elif action == "GIVE ITEM":
+                # Clearing up the command line window
+                clear()
+
+                # Getting a list of items which are neither runes nor eggs in the player's item inventory
+                neither_rune_nor_egg_items: list = [item for item in new_game.player_data.item_inventory.get_items()
+                                                    if not isinstance(item, Rune) and not isinstance(item, Egg)]
+
+                # If items which are neither runes nor eggs exist and there are legendary creatures in the
+                # legendary creature inventory, ask the player to choose which item is to be given to a
+                # legendary creature.
+                if len(neither_rune_nor_egg_items) > 0 and \
+                        len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()) > 0:
+                    print("Below is a list of items which are neither runes nor eggs that you have.\n")
+                    curr_item_index: int = 1  # initial value
+                    for item in neither_rune_nor_egg_items:
+                        print("ITEM #" + str(curr_item_index))
+                        print(str(item) + "\n")
+                        curr_item_index += 1
+
+                    item_index: int = int(input("Please enter the index of the item you want to give (1 - " +
+                                                str(len(neither_rune_nor_egg_items)) + "): "))
+                    while item_index < 1 or item_index > len(neither_rune_nor_egg_items):
+                        item_index = int(input("Sorry, invalid input! Please enter the index of the item you want to "
+                                               "give (1 - " +
+                                               str(len(neither_rune_nor_egg_items)) + "): "))
+
+                    item_to_give: Item = neither_rune_nor_egg_items[item_index - 1]
+                    print("Below is a list of legendary creatures you have.\n")
+                    curr_legendary_creature_index: int = 1  # initial value
+                    for legendary_creature in new_game.player_data.legendary_creature_inventory. \
+                            get_legendary_creatures():
+                        print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                        print(str(legendary_creature) + "\n")
+                        curr_legendary_creature_index += 1
+
+                    legendary_creature_index: int = int(input("Please enter the index of the legendary creature you "
+                                                              "want to give the item to (1 - " +
+                                                              str(len(new_game.player_data.legendary_creature_inventory.
+                                                                      get_legendary_creatures())) + "): "))
+                    while legendary_creature_index < 1 or legendary_creature_index > len(
+                            new_game.player_data.legendary_creature_inventory.
+                                    get_legendary_creatures()):
+                        legendary_creature_index = int(
+                            input("Sorry, invalid input! Please enter the index of the legendary creature you "
+                                  "want to give the item to (1 - " +
+                                  str(len(new_game.player_data.legendary_creature_inventory.
+                                          get_legendary_creatures())) + "): "))
+
+                    chosen_legendary_creature: LegendaryCreature = new_game.player_data.legendary_creature_inventory. \
+                        get_legendary_creatures()[legendary_creature_index - 1]
+
+                    # Give the item to the chosen legendary creature
+                    if new_game.player_data.give_item_to_legendary_creature(item_to_give, chosen_legendary_creature):
+                        print("You have successfully given " + str(item_to_give.name) + " to " +
+                              str(chosen_legendary_creature.name) + ".")
+                    else:
+                        print("Sorry! Item " + str(item_to_give.name) + " cannot be given to " +
+                              str(chosen_legendary_creature.name) + ".")
+
+            elif action == "FEED LEGENDARY CREATURE":
+                # Clearing up the command line window
+                clear()
+
+                # Printing a list of legendary creatures the player can feed.
+                print("Below is a list of legendary creatures you can feed.\n")
+                curr_legendary_creature_index: int = 1  # initial value
+                for legendary_creature in new_game.player_data.legendary_creature_inventory.get_legendary_creatures():
+                    print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                    print(str(legendary_creature) + "\n")
+                    curr_legendary_creature_index += 1
+
+                legendary_creature_index: int = int(input("Please enter the index of the legendary "
+                                                          "creature you want to feed (1 - " +
+                                                          str(len(new_game.player_data.legendary_creature_inventory.
+                                                                  get_legendary_creatures())) + "): "))
+                while legendary_creature_index < 1 or legendary_creature_index > \
+                        len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()):
+                    legendary_creature_index = int(
+                        input("Sorry, invalid input! Please enter the index of the legendary "
+                              "creature you want to feed (1 - " +
+                              str(len(new_game.player_data.legendary_creature_inventory.
+                                      get_legendary_creatures())) + "): "))
+
+                chosen_legendary_creature: LegendaryCreature = new_game.player_data.legendary_creature_inventory. \
+                    get_legendary_creatures()[legendary_creature_index - 1]
+                food: mpf = mpf(input("Please enter the amount of food you want to feed (0 - " +
+                                      str(new_game.player_data.food) + "): "))
+                while food < 0 or food > new_game.player_data.food:
+                    food: mpf = mpf(input("Sorry, invalid input! Please enter the amount of food "
+                                          "you want to feed (0 - " +
+                                          str(new_game.player_data.food) + "): "))
+
+                new_game.player_data.feed_legendary_creature(chosen_legendary_creature)
+                print("You have successfully fed " + str(food) + " food to " + str(chosen_legendary_creature.name) +
+                      "!")
+
+            elif action == "PLACE EGG":
+                # Clearing up the command line window
+                clear()
+
+                # Getting a list of hatcheries the player has.
+                hatcheries: list = []  # initial value
+                for section in new_game.player_data.player_city.get_sections():
+                    for x in range(section.SECTION_WIDTH):
+                        for y in range(section.SECTION_HEIGHT):
+                            curr_tile: CityTile = section.get_tile_at(x, y)
+                            if isinstance(curr_tile.building, Hatchery):
+                                hatcheries.append(curr_tile.building)
+
+                # Getting a list of eggs the player can place.
+                eggs: list = []  # initial value
+                for item in new_game.player_data.item_inventory.get_items():
+                    if isinstance(item, Egg):
+                        eggs.append(item)
+
+                # If there are hatcheries and eggs, ask the player to choose which egg to be placed at which hatchery
+                if len(hatcheries) > 0 and len(eggs) > 0:
+                    print("Below is a list of hatcheries you have.\n")
+                    curr_hatchery_index: int = 1
+                    for hatchery in hatcheries:
+                        print("HATCHERY #" + str(curr_hatchery_index))
+                        print(str(hatchery) + "\n")
+                        curr_hatchery_index += 1
+
+                    hatchery_index: int = int(input("Please enter the index of the hatchery "
+                                                    "you want to place an egg at (1 - " +
+                                                    str(len(hatcheries)) + "): "))
+                    while hatchery_index < 1 or hatchery_index > len(hatcheries):
+                        hatchery_index = int(input("Sorry, invalid input! Please enter the index of the hatchery "
+                                                   "you want to place an egg at (1 - " +
+                                                   str(len(hatcheries)) + "): "))
+
+                    chosen_hatchery: Hatchery = hatcheries[hatchery_index - 1]
+
+                    print("Below is a list of eggs you can place.\n")
+                    curr_egg_index: int = 1
+                    for egg in eggs:
+                        print("EGG #" + str(curr_egg_index))
+                        print(str(egg) + "\n")
+                        curr_egg_index += 1
+
+                    egg_index: int = int(input("Please enter the index of the egg you want to place (1 - " +
+                                               str(len(eggs)) + "): "))
+                    while egg_index < 1 or egg_index > len(eggs):
+                        egg_index = int(input("Sorry, invalid input! Please enter the index of the egg "
+                                              "you want to place (1 - " +
+                                              str(len(eggs)) + "): "))
+
+                    chosen_egg: Egg = eggs[egg_index - 1]
+                    if new_game.player_data.place_egg_in_hatchery(chosen_egg, chosen_hatchery):
+                        print("You have succesfully placed " + str(chosen_egg.name) + " at " +
+                              str(chosen_hatchery.name) + "!")
+                    else:
+                        print("Sorry! You cannot place an egg in " + str(chosen_hatchery.name) + "!")
+
+            elif action == "FUSE LEGENDARY CREATURES":
+                # Clearing up the command line window
+                clear()
+
+                # Getting a list of fusion centers in the player's city
+                fusion_centers: list = []  # initial value
+                for section in new_game.player_data.player_city.get_sections():
+                    for x in range(section.SECTION_WIDTH):
+                        for y in range(section.SECTION_HEIGHT):
+                            curr_tile: CityTile = section.get_tile_at(x, y)
+                            if isinstance(curr_tile.building, FusionCenter):
+                                fusion_centers.append(curr_tile.building)
+
+                potential_material_legendary_creatures: list = [legendary_creature for legendary_creature in
+                                                                new_game.player_data.legendary_creature_inventory.
+                                                                    get_legendary_creatures() if legendary_creature not
+                                                                in new_game.player_data.battle_team.
+                                                                    get_legendary_creatures() and
+                                                                not legendary_creature.placed_in_training_area and
+                                                                not legendary_creature.placed_in_habitat]
+                # If there are fusion centers and at least two legendary creatures which can be used as materials,
+                # ask the user to choose which fusion center to use.
+                if len(fusion_centers) > 0 and len(potential_material_legendary_creatures) >= 2:
+                    print("Below is a list of fusion centers that you have.\n")
+                    curr_fusion_center_index: int = 1  # initial value
+                    for fusion_center in fusion_centers:
+                        print("FUSION CENTER #" + str(curr_fusion_center_index))
+                        print(str(fusion_center) + "\n")
+                        curr_fusion_center_index += 1
+
+                    fusion_center_index: int = int(input("Please enter the index of the fusion center you want "
+                                                         "to use (1 - " + str(len(fusion_centers)) + "): "))
+                    while fusion_center_index < 1 or fusion_center_index > len(fusion_centers):
+                        fusion_center_index: int = int(input("Please enter the index of the fusion center you want "
+                                                             "to use (1 - " + str(len(fusion_centers)) + "): "))
+
+                    chosen_fusion_center: FusionCenter = fusion_centers[fusion_center_index - 1]
+
+                    print("Below is a list of legendary creatures you can use as materials.\n")
+                    curr_legendary_creature_index: int = 1  # initial value
+                    for legendary_creature in potential_material_legendary_creatures:
+                        print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                        print(str(legendary_creature) + "\n")
+                        curr_legendary_creature_index += 1
+
+                    chosen_indices: list = []  # initial value
+                    for i in range(2):
+                        legendary_creature_index: int = int(input("Please enter the index of the "
+                                                                  "legendary creature you want to use (1 - " +
+                                                                  str(len(potential_material_legendary_creatures))))
+                        while legendary_creature_index < 1 or legendary_creature_index > \
+                                len(potential_material_legendary_creatures) or legendary_creature_index in chosen_indices:
+                            legendary_creature_index = int(input("Sorry, invalid input! Please enter the index of the "
+                                                                 "legendary creature you want to use (1 - " +
+                                                                 str(len(potential_material_legendary_creatures))))
+
+                        chosen_indices.append(legendary_creature_index)
+
+                    first_index: int = chosen_indices[0] - 1
+                    second_index: int = chosen_indices[0] - 1
+                    first_legendary_creature: LegendaryCreature = potential_material_legendary_creatures[first_index]
+                    second_legendary_creature: LegendaryCreature = potential_material_legendary_creatures[second_index]
+                    new_game.player_data.fuse_legendary_creatures(first_legendary_creature,
+                                                                  second_legendary_creature, chosen_fusion_center)
+
+            elif action == "MAKE A WISH":
+                # Clearing up the command line window
+                clear()
+
+                # Getting a list of temples of wishes in the player's city
+                temples_of_wishes: list = []  # initial value
+                for section in new_game.player_data.player_city.get_sections():
+                    for x in range(section.SECTION_WIDTH):
+                        for y in range(section.SECTION_HEIGHT):
+                            curr_tile: CityTile = section.get_tile_at(x, y)
+                            if isinstance(curr_tile.building, TempleOfWishes):
+                                temples_of_wishes.append(curr_tile.building)
+
+                # If there are temples of wishes, ask the player to choose which temple of wishes he/she wants to use
+                if len(temples_of_wishes) > 0:
+                    print("Below is a list of temples of wishes you can use.")
+                    curr_temple_of_wishes_index: int = 1  # initial value
+                    for temple_of_wishes in temples_of_wishes:
+                        print("TEMPLE OF WISHES #" + str(curr_temple_of_wishes_index))
+                        print(str(temple_of_wishes) + "\n")
+                        curr_temple_of_wishes_index += 1
+
+                    temple_of_wishes_index: int = int(input("Please enter the index of the temple of wishes "
+                                                            "you want to use (1 - " +
+                                                            str(len(temples_of_wishes)) + "): "))
+                    while temple_of_wishes_index < 1 or temple_of_wishes_index > len(temples_of_wishes):
+                        temple_of_wishes_index = int(input("Sorry, invalid input! Please enter the index of the "
+                                                           "temple of wishes "
+                                                           "you want to use (1 - " +
+                                                           str(len(temples_of_wishes)) + "): "))
+
+                    chosen_temple_of_wishes: TempleOfWishes = temples_of_wishes[temple_of_wishes_index - 1]
+                    new_game.player_data.make_a_wish(chosen_temple_of_wishes)
+
+            elif action == "MANAGE ITEM INVENTORY":
+                # Clearing up the command line window
+                clear()
+                if len(new_game.player_data.item_inventory.get_items()) > 0:
+                    print("Below is a list of items in your item inventory.\n")
+                    curr_item_index: int = 1
+                    for item in new_game.player_data.item_inventory.get_items():
+                        print("ITEM #" + str(curr_item_index))
+                        print(str(item) + "\n")
+                        curr_item_index += 1
+
+                    print("Enter 'Y' for yes.")
+                    print("Enter anything else for no.")
+                    sell_item: str = input("Do you want to sell an item? ")
+                    if sell_item == "Y":
+                        item_index: int = int(input("Please enter the index of the item you want to sell (1 - " +
+                                                    str(len(new_game.player_data.item_inventory.get_items())) + "): "))
+                        while item_index < 1 or item_index > len(new_game.player_data.item_inventory.get_items()):
+                            item_index = int(input("Sorry, invalid input! Please enter the index of the item you "
+                                                   "want to sell (1 - " +
+                                                   str(len(new_game.player_data.item_inventory.get_items())) + "): "))
+
+                        to_be_sold: Item = new_game.player_data.item_inventory.get_items()[item_index - 1]
+                        if new_game.player_data.sell_item(to_be_sold):
+                            print("Congratulations! You have earned " + str(to_be_sold.sell_gold_gain) + " gold and " +
+                                  str(to_be_sold.sell_gem_gain) + " gems for selling " + str(to_be_sold.name) + "!")
+                        else:
+                            print("Sorry! " + str(to_be_sold.name) + " cannot be sold!")
+
+                    runes: list = []  # initial value
+                    for item in new_game.player_data.item_inventory.get_items():
+                        if isinstance(item, Rune):
+                            runes.append(item)
+
+                    # Ask the player which rune to level up if there are runes in the item inventory
+                    if len(runes) > 0:
+                        print("Below is a list of runes you have.\n")
+                        curr_rune_index: int = 1  # initial value
+                        for rune in runes:
+                            print("RUNE #" + str(curr_rune_index))
+                            print(str(rune) + "\n")
+                            curr_rune_index += 1
+
+                        print("Enter 'Y' for yes.")
+                        print("Enter anything else for no.")
+                        level_up_rune: str = input("Do you want to level up a rune? ")
+                        if level_up_rune == "Y":
+                            rune_index: int = int(input("Please enter the index of the rune you want to level "
+                                                        "up (1 - " + str(len(runes)) + "): "))
+                            while rune_index < 1 or rune_index > len(runes):
+                                rune_index = int(input("Sorry, invalid input! Please enter the index of the rune you "
+                                                       "want to level "
+                                                       "up (1 - " + str(len(runes)) + "): "))
+
+                            chosen_rune: Rune = runes[rune_index - 1]
+                            new_game.player_data.level_up_rune(chosen_rune)
+
+            elif action == "MANAGE LEGENDARY CREATURE INVENTORY":
+                # Clearing up the command line window
+                clear()
+                if len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()) > 0:
+                    print("Below is a list of legendary creatures in your legendary creature inventory.\n")
+                    curr_legendary_creature_index: int = 1  # initial value
+                    for legendary_creature in new_game.player_data.legendary_creature_inventory. \
+                            get_legendary_creatures():
+                        print("LEGENDARY CREATURE #" + str(curr_legendary_creature_index))
+                        print(str(legendary_creature) + "\n")
+                        curr_legendary_creature_index += 1
+
+                    legendary_creature_index: int = int(input("Please enter the index of the legendary creature "
+                                                              "you want to remove (1 - " +
+                                                              str(len(new_game.player_data.
+                                                                      legendary_creature_inventory.
+                                                                      get_legendary_creatures())) + "): "))
+                    while legendary_creature_index < 1 or legendary_creature_index > \
+                            len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()):
+                        legendary_creature_index = int(input("Sorry, invalid input! Please enter the "
+                                                             "index of the legendary creature "
+                                                             "you want to remove (1 - " +
+                                                             str(len(new_game.player_data.
+                                                                     legendary_creature_inventory.
+                                                                     get_legendary_creatures())) + "): "))
+
+                    to_be_removed: LegendaryCreature = \
+                        new_game.player_data.legendary_creature_inventory.get_legendary_creatures() \
+                            [legendary_creature_index - 1]
+                    new_game.player_data.remove_legendary_creature(to_be_removed)
+
+            elif action == "MANAGE BATTLE TEAM":
+                # Clearing up the command line window
+                clear()
+                if len(new_game.player_data.battle_team.get_legendary_creatures()) > 0:
+                    print("Below is a list of legendary creatures in your battle team.\n")
+                    current_legendary_creature_index: int = 1  # initial value
+                    for legendary_creature in new_game.player_data.battle_team.get_legendary_creatures():
+                        print("LEGENDARY CREATURE #" + str(current_legendary_creature_index))
+                        print(str(legendary_creature) + "\n")
+                        current_legendary_creature_index += 1
+
+                    print("Enter 'Y' for yes.")
+                    print("Enter anything else for no.")
+                    remove_legendary_creature: str = input("Do you want to remove a legendary creature from "
+                                                           "your team? ")
+                    if remove_legendary_creature == "Y":
+                        legendary_creature_index: int = int(input("Please enter the index of the legendary "
+                                                                  "creature you want to remove from "
+                                                                  "your battle team (1 - " +
+                                                                  str(len(new_game.player_data.
+                                                                          battle_team.get_legendary_creatures())) +
+                                                                  "): "))
+                        while legendary_creature_index < 1 or legendary_creature_index > \
+                                len(new_game.player_data.battle_team.get_legendary_creatures()):
+                            legendary_creature_index = int(input("Sorry, invalid input! Please enter the index of the "
+                                                                 "legendary "
+                                                                 "creature you want to remove from "
+                                                                 "your battle team (1 - " +
+                                                                 str(len(new_game.player_data.
+                                                                         battle_team.get_legendary_creatures())) +
+                                                                 "): "))
+
+                        to_be_removed: LegendaryCreature = new_game.player_data.battle_team.get_legendary_creatures() \
+                            [legendary_creature_index - 1]
+                        new_game.player_data.remove_legendary_creature_from_team(to_be_removed)
+
+                if len(new_game.player_data.battle_team.get_legendary_creatures()) < Team.MAX_LEGENDARY_CREATURES:
+                    print("Below is a list of legendary creatures you have.\n")
+                    current_legendary_creature_index: int = 1  # initial value
+                    for legendary_creature in new_game.player_data.legendary_creature_inventory.get_legendary_creatures():
+                        print("LEGENDARY CREATURE #" + str(current_legendary_creature_index))
+                        print(str(legendary_creature) + "\n")
+                        current_legendary_creature_index += 1
+
+                    print("Enter 'Y' for yes.")
+                    print("Enter anything else for no.")
+                    add_legendary_creature: str = input("Do you want to add a legendary creature to your team? ")
+                    if add_legendary_creature == "Y":
+                        legendary_creature_index: int = int(input("Please enter the index of the legendary "
+                                                                  "creature you want to add to your "
+                                                                  "battle team (1 - " +
+                                                                  str(len(new_game.player_data.
+                                                                          legendary_creature_inventory.
+                                                                          get_legendary_creatures())) + "): "))
+                        while legendary_creature_index < 1 or legendary_creature_index > \
+                                len(new_game.player_data.legendary_creature_inventory.get_legendary_creatures()):
+                            legendary_creature_index = int(input("Sorry, invalid input! Please enter the index "
+                                                                 "of the legendary "
+                                                                 "creature you want to add to your "
+                                                                 "battle team (1 - " +
+                                                                 str(len(new_game.player_data.
+                                                                         legendary_creature_inventory.
+                                                                         get_legendary_creatures())) + "): "))
+
+                        to_be_added: LegendaryCreature = \
+                            new_game.player_data.legendary_creature_inventory.get_legendary_creatures() \
+                                [legendary_creature_index - 1]
+                        new_game.player_data.add_legendary_creature_to_team(to_be_added)
+
+            elif action == "MANAGE PLAYER CITY":
+                # Clearing up the command line window
+                clear()
+
+                # Asking whether the player wants to add a new section to the player city or not
+                print("Enter 'Y' for yes.")
+                print("Enter anything else for no.")
+                add_section: str = input("Do you want to add a new section to your player city for " +
+                                         str(new_game.player_data.player_city.section_build_gold_cost) + " gold? ")
+                if add_section == "Y":
+                    new_game.player_data.add_section_to_player_city()
+
+                # Showing the sections in the player's city
+                if len(new_game.player_data.player_city.get_sections()) > 0:
+                    section_count: int = 1
+                    for section in new_game.player_data.player_city.get_sections():
+                        print("----------SECTION #" + str(section_count) + "----------")
+                        print(str(section) + "\n")
+                        section_count += 1
+
+                    chosen_section_index: int = int(input("Enter the index of the section you want to manage (1 - " +
+                                                          str(len(
+                                                              new_game.player_data.player_city.get_sections())) + "): "))
+                    while chosen_section_index < 1 or chosen_section_index > \
+                            len(new_game.player_data.player_city.get_sections()):
+                        chosen_section_index = int(input("Sorry, invalid input! Enter the index of the section "
+                                                         "you want to manage (1 - " +
+                                                         str(len(
+                                                             new_game.player_data.player_city.get_sections())) + "): "))
+
+                    chosen_section: Section = new_game.player_data.player_city.get_sections()[chosen_section_index - 1]
+                    print("Enter 'LEVEL UP BUILDING' to level up a building at an section tile.")
+                    print("Enter 'BUILD BUILDING' to build at an section tile.")
+                    print("Enter 'REMOVE BUILDING' to remove a building from an section tile.")
+                    valid_sub_actions: list = ["LEVEL UP BUILDING", "BUILD BUILDING", "REMOVE BUILDING"]
+                    sub_action: str = input("What do you want to do? ")
+                    while sub_action not in valid_sub_actions:
+                        print("Enter 'LEVEL UP BUILDING' to level up a building at an section tile.")
+                        print("Enter 'BUILD BUILDING' to build at an section tile.")
+                        print("Enter 'REMOVE BUILDING' to remove a building from an section tile.")
+                        sub_action = input("Sorry, invalid input! What do you want to do? ")
+
+                    if sub_action == "LEVEL UP BUILDING":
+                        tile_x: int = int(input("Please enter x-coordinates of the building to be levelled up: "))
+                        tile_y: int = int(input("Please enter y-coordinates of the building to be levelled up: "))
+                        if new_game.player_data.level_up_building_at_section_tile(chosen_section_index - 1, tile_x,
+                                                                                  tile_y):
+                            print("You have successfully levelled up " +
+                                  str(chosen_section.get_tile_at(tile_x, tile_y).building.name) + "!")
+                        else:
+                            print("Building level up failed!")
+                    elif sub_action == "BUILD BUILDING":
+                        tile_x: int = int(input("Please enter x-coordinates of the tile to build at: "))
+                        tile_y: int = int(input("Please enter y-coordinates of the tile to build at: "))
+                        if isinstance(chosen_section.get_tile_at(tile_x, tile_y), CityTile):
+                            curr_tile: CityTile = chosen_section.get_tile_at(tile_x, tile_y)
+                            if curr_tile.building is None:
+                                print("Below is a list of buildings you can build on the tile.")
+                                building_count: int = 1
+                                for building in building_shop.get_buildings_sold():
+                                    print("BUILDING #" + str(building_count))
+                                    print(str(building) + "\n")
+                                    building_count += 1
+
+                                building_index: int = int(input("Please enter the index of the building you "
+                                                                "want to build (1 - " +
+                                                                str(len(building_shop.get_buildings_sold())) + "): "))
+                                while building_index < 1 or building_index > len(building_shop.get_buildings_sold()):
+                                    building_index = int(input("Sorry, invalid input! Please enter the index of "
+                                                               "the building you "
+                                                               "want to build (1 - " +
+                                                               str(len(building_shop.get_buildings_sold())) + "): "))
+
+                                to_build: Building = building_shop.get_buildings_sold()[building_index - 1]
+                                if new_game.player_data.build_at_section_tile(chosen_section_index - 1, tile_x, tile_y,
+                                                                              to_build):
+                                    print("You have successfully built " + str(to_build.name) + "!")
+                                else:
+                                    print("Sorry, you cannot build " + str(to_build.name) + "!")
+                            else:
+                                print("Sorry, you cannot build here!")
+                        else:
+                            print("Sorry, you cannot build here!")
+                    elif sub_action == "REMOVE BUILDING":
+                        tile_x: int = int(input("Please enter x-coordinates of the tile to remove building from: "))
+                        tile_y: int = int(input("Please enter y-coordinates of the tile to remove building from: "))
+                        if new_game.player_data.remove_building_from_section_tile(chosen_section_index - 1, tile_x,
+                                                                                  tile_y):
+                            print("You have successfully removed a building!")
+                        else:
+                            print("You failed to remove a building!")
+
+            elif action == "PLAY ADVENTURE MODE":
+                # Clearing up the command line window
+                clear()
+
+                # Getting a list of levels for the player to choose from.
+                print("Below is a list of levels you can choose from.\n")
+                curr_level_index: int = 1  # initial value
+                for level in new_game.player_data.get_unlocked_levels():
+                    print("LEVEL #" + str(curr_level_index))
+                    print(str(level) + "\n")
+                    curr_level_index += 1
+
+                level_index: int = int(input("Please enter the index of the level "
+                                             "you want to battle in (1 - " +
+                                             str(len(new_game.player_data.get_unlocked_levels())) + "): "))
+                while level_index < 1 or level_index > len(new_game.player_data.get_unlocked_levels()):
+                    level_index = int(input("Sorry, invalid input! Please enter the index of the level "
+                                            "you want to battle in (1 - " +
+                                            str(len(new_game.player_data.get_unlocked_levels())) + "): "))
+
+                chosen_level: Level = new_game.player_data.get_unlocked_levels()[level_index - 1]
+                
+                # Start the battle and battle until all stages are cleared
+                curr_stage_number: int = 0
+                current_stage: Stage = chosen_level.curr_stage(curr_stage_number)
+                while chosen_level.next_stage(curr_stage_number) is not None and \
+                        not new_game.player_data.battle_team.all_died():
+                    # Clearing up the command line window
+                    clear()
+
+                    # Show the current stage
+                    print("--------------------STAGE #" + str(curr_stage_number + 1) + "--------------------")
+                    curr_battle: Battle = Battle(new_game.player_data.battle_team,
+                                                 Team(current_stage.get_enemies_list()))
+                    while curr_battle.winner is None:
+                        # Printing out the stats of legendary creatures in both teams
+                        print("Below are the stats of all legendary creatures in player's team.\n")
+                        for legendary_creature in curr_battle.team1.get_legendary_creatures():
+                            print(str(legendary_creature) + "\n")
+
+                        print("Below are the stats of all legendary creatures in enemy's team.\n")
+                        for legendary_creature in curr_battle.team2.get_legendary_creatures():
+                            print(str(legendary_creature) + "\n")
+
+                        # Make a legendary creature move
+                        curr_battle.get_someone_to_move()
+                        assert isinstance(curr_battle.whose_turn, LegendaryCreature), "Cannot proceed with battle!"
+
+                        if not curr_battle.whose_turn.can_move:
+                            # Skip turn
+                            curr_battle.whose_turn.have_turn(curr_battle.whose_turn, None, "NORMAL HEAL")
+
+                            # Make another legendary creature move
+                            curr_battle.get_someone_to_move()
+                            assert isinstance(curr_battle.whose_turn, LegendaryCreature), \
+                                "Cannot proceed with battle!"
+
+                        # Checking which legendary creature moves
+                        if curr_battle.whose_turn in curr_battle.team1.get_legendary_creatures():
+                            moving_legendary_creature: LegendaryCreature = curr_battle.whose_turn
+                            # Asking the player what he/she wants to do
+                            print("Enter 'NORMAL ATTACK' for normal attack.")
+                            print("Enter 'NORMAL HEAL' for normal heal.")
+                            print("Enter anything else to use a skill (only applicable if you have usable skills).")
+                            usable_skills: list = [skill for skill in curr_battle.whose_turn.get_skills()
+                                                   if curr_battle.whose_turn.curr_magic_points >=
+                                                   skill.magic_points_cost and isinstance(skill, ActiveSkill)]
+                            possible_actions: list = ["NORMAL ATTACK", "NORMAL HEAL"]
+                            trainer_battle_action: str = input("What do you want to do? ")
+                            while len(usable_skills) == 0 and trainer_battle_action not in possible_actions:
+                                print("Enter 'NORMAL ATTACK' for normal attack.")
+                                print("Enter 'NORMAL HEAL' for normal heal.")
+                                trainer_battle_action = input("Sorry, invalid input! What do you want to do? ")
+
+                            if trainer_battle_action not in possible_actions:
+                                # Use skill
+                                trainer_battle_action = "USE SKILL"
+
+                                # Show a list of skills the player can use
+                                print("Below is a list of skills you can use.\n")
+                                curr_skill_index: int = 1  # initial value
+                                for skill in usable_skills:
+                                    print("SKILL #" + str(curr_skill_index))
+                                    print(str(skill) + "\n")
+                                    curr_skill_index += 1
+
+                                skill_index: int = int(input("Please enter the index of the skill "
+                                                             "you want to use (1 - " +
+                                                             str(len(usable_skills)) + "): "))
+                                while skill_index < 1 or skill_index > len(usable_skills):
+                                    skill_index = int(input("Sorry, invalid input! Please enter the "
+                                                            "index of the skill "
+                                                            "you want to use (1 - " +
+                                                            str(len(usable_skills)) + "): "))
+
+                                skill_to_use: ActiveSkill = usable_skills[skill_index - 1]
+                                if skill_to_use.active_skill_type == "ATTACK":
+                                    # Asking the user to select a target
+                                    print("Below is a list of enemies you can attack.")
+                                    enemy_index: int = 1  # initial value
+                                    for enemy in curr_battle.team2.get_legendary_creatures():
+                                        print("ENEMY #" + str(enemy_index))
+                                        print(str(enemy) + "\n")
+                                        enemy_index += 1
+
+                                    chosen_enemy_index: int = int(input("Please enter the index of the "
+                                                                        "enemy you want to attack (1 - " +
+                                                                        str(len(curr_battle.
+                                                                                team2.get_legendary_creatures())) +
+                                                                        "): "))
+                                    while chosen_enemy_index < 1 or chosen_enemy_index > len(curr_battle.
+                                                                                                     team2.get_legendary_creatures()):
+                                        chosen_enemy_index = int(input("Sorry, invalid input! "
+                                                                       "Please enter the index of the "
+                                                                       "enemy you want to attack (1 - " +
+                                                                       str(len(curr_battle.
+                                                                               team2.get_legendary_creatures())) +
+                                                                       "): "))
+
+                                    chosen_enemy_target: LegendaryCreature = curr_battle.team2. \
+                                        get_legendary_creatures()[chosen_enemy_index - 1]
+                                    curr_battle.whose_turn.have_turn(chosen_enemy_target, skill_to_use,
+                                                                     trainer_battle_action)
+                                    if random.random() < chosen_enemy_target.counterattack_chance + \
+                                            chosen_enemy_target.counterattack_chance_up:
+                                        chosen_enemy_target.counterattack(curr_battle.whose_turn)
+
+                                elif skill_to_use.active_skill_type == "HEAL":
+                                    # Asking the user to select who to heal
+                                    print("Below is a list of allies you can heal.")
+                                    ally_index: int = 1  # initial value
+                                    for ally in curr_battle.team1.get_legendary_creatures():
+                                        print("ALLY #" + str(ally_index))
+                                        print(str(ally) + "\n")
+                                        ally_index += 1
+
+                                    chosen_ally_index: int = int(input("Please enter the index of the "
+                                                                       "ally you want to heal (1 - " +
+                                                                       str(len(curr_battle.
+                                                                               team1.get_legendary_creatures())) +
+                                                                       "): "))
+                                    while chosen_ally_index < 1 or chosen_ally_index > len(curr_battle.
+                                                                                                   team1.get_legendary_creatures()):
+                                        chosen_ally_index = int(input("Sorry, invalid input! "
+                                                                      "Please enter the index of the "
+                                                                      "ally you want to heal (1 - " +
+                                                                      str(len(curr_battle.
+                                                                              team1.get_legendary_creatures())) +
+                                                                      "): "))
+
+                                    chosen_ally_target: LegendaryCreature = curr_battle.team1. \
+                                        get_legendary_creatures()[chosen_ally_index - 1]
+                                    curr_battle.whose_turn.have_turn(chosen_ally_target, skill_to_use,
+                                                                     trainer_battle_action)
+                                elif skill_to_use.active_skill_type == "ALLIES EFFECT":
+                                    # Asking the user to select who to apply ally effect on
+                                    print("Below is a list of allies you can apply ally effect on.")
+                                    ally_index: int = 1  # initial value
+                                    for ally in curr_battle.team1.get_legendary_creatures():
+                                        print("ALLY #" + str(ally_index))
+                                        print(str(ally) + "\n")
+                                        ally_index += 1
+
+                                    chosen_ally_index: int = int(input("Please enter the index of the "
+                                                                       "ally you want to apply ally effect on (1 - " +
+                                                                       str(len(curr_battle.
+                                                                               team1.get_legendary_creatures())) +
+                                                                       "): "))
+                                    while chosen_ally_index < 1 or chosen_ally_index > len(curr_battle.
+                                                                                                   team1.get_legendary_creatures()):
+                                        chosen_ally_index = int(input("Sorry, invalid input! "
+                                                                      "Please enter the index of the "
+                                                                      "ally you want to apply ally effect on (1 - " +
+                                                                      str(len(curr_battle.
+                                                                              team1.get_legendary_creatures())) +
+                                                                      "): "))
+
+                                    chosen_ally_target: LegendaryCreature = curr_battle.team1. \
+                                        get_legendary_creatures()[chosen_ally_index - 1]
+                                    curr_battle.whose_turn.have_turn(chosen_ally_target, skill_to_use,
+                                                                     trainer_battle_action)
+                                elif skill_to_use.active_skill_type == "ENEMIES EFFECT":
+                                    # Asking the user to select who to apply enemy effect on
+                                    print("Below is a list of enemies you can apply enemy effect on.")
+                                    enemy_index: int = 1  # initial value
+                                    for enemy in curr_battle.team2.get_legendary_creatures():
+                                        print("ENEMY #" + str(enemy_index))
+                                        print(str(enemy) + "\n")
+                                        enemy_index += 1
+
+                                    chosen_enemy_index: int = int(input("Please enter the index of the "
+                                                                        "enemy you want to apply enemy effect on"
+                                                                        " (1 - " +
+                                                                        str(len(curr_battle.
+                                                                                team2.get_legendary_creatures())) +
+                                                                        "): "))
+                                    while chosen_enemy_index < 1 or chosen_enemy_index > len(curr_battle.
+                                                                                                     team2.get_legendary_creatures()):
+                                        chosen_enemy_index = int(input("Sorry, invalid input! "
+                                                                       "Please enter the index of the "
+                                                                       "enemy you want to apply enemy effect on"
+                                                                       " (1 - " +
+                                                                       str(len(curr_battle.
+                                                                               team2.get_legendary_creatures())) +
+                                                                       "): "))
+
+                                    chosen_enemy_target: LegendaryCreature = curr_battle.team2. \
+                                        get_legendary_creatures()[chosen_enemy_index - 1]
+                                    curr_battle.whose_turn.have_turn(chosen_enemy_target, skill_to_use,
+                                                                     trainer_battle_action)
+
+                            elif trainer_battle_action == "NORMAL ATTACK":
+                                # Asking the user to select a target
+                                print("Below is a list of enemies you can attack.")
+                                enemy_index: int = 1  # initial value
+                                for enemy in curr_battle.team2.get_legendary_creatures():
+                                    print("ENEMY #" + str(enemy_index))
+                                    print(str(enemy) + "\n")
+                                    enemy_index += 1
+
+                                chosen_enemy_index: int = int(input("Please enter the index of the "
+                                                                    "enemy you want to attack (1 - " +
+                                                                    str(len(curr_battle.
+                                                                            team2.get_legendary_creatures())) +
+                                                                    "): "))
+                                while chosen_enemy_index < 1 or chosen_enemy_index > len(curr_battle.
+                                                                                                 team2.get_legendary_creatures()):
+                                    chosen_enemy_index = int(input("Sorry, invalid input! "
+                                                                   "Please enter the index of the "
+                                                                   "enemy you want to attack (1 - " +
+                                                                   str(len(curr_battle.
+                                                                           team2.get_legendary_creatures())) +
+                                                                   "): "))
+
+                                chosen_enemy_target: LegendaryCreature = curr_battle.team2. \
+                                    get_legendary_creatures()[chosen_enemy_index - 1]
+                                curr_battle.whose_turn.have_turn(chosen_enemy_target, None, trainer_battle_action)
+                                if random.random() < chosen_enemy_target.counterattack_chance + \
+                                        chosen_enemy_target.counterattack_chance_up:
+                                    chosen_enemy_target.counterattack(curr_battle.whose_turn)
+
+                            elif trainer_battle_action == "NORMAL HEAL":
+                                # Asking the user to select who to heal
+                                print("Below is a list of allies you can heal.")
+                                ally_index: int = 1  # initial value
+                                for ally in curr_battle.team1.get_legendary_creatures():
+                                    print("ALLY #" + str(ally_index))
+                                    print(str(ally) + "\n")
+                                    ally_index += 1
+
+                                chosen_ally_index: int = int(input("Please enter the index of the "
+                                                                   "ally you want to heal (1 - " +
+                                                                   str(len(curr_battle.
+                                                                           team1.get_legendary_creatures())) +
+                                                                   "): "))
+                                while chosen_ally_index < 1 or chosen_ally_index > len(curr_battle.
+                                                                                               team1.get_legendary_creatures()):
+                                    chosen_ally_index = int(input("Sorry, invalid input! "
+                                                                  "Please enter the index of the "
+                                                                  "ally you want to heal (1 - " +
+                                                                  str(len(curr_battle.
+                                                                          team1.get_legendary_creatures())) +
+                                                                  "): "))
+
+                                chosen_ally_target: LegendaryCreature = curr_battle.team1. \
+                                    get_legendary_creatures()[chosen_ally_index - 1]
+                                curr_battle.whose_turn.have_turn(chosen_ally_target, None,
+                                                                 trainer_battle_action)
+                            else:
+                                pass
+
+                            # Checking the case where the moving legendary creature gets an extra turn
+                            if random.random() < moving_legendary_creature.extra_turn_chance + \
+                                    moving_legendary_creature.extra_turn_chance_up and \
+                                    moving_legendary_creature.can_move:
+                                curr_battle.whose_turn = moving_legendary_creature
+
+                                # Recovering magic points
+                                curr_battle.whose_turn.recover_magic_points()
+                            else:
+                                curr_battle.get_someone_to_move()
+
+                        elif curr_battle.whose_turn in curr_battle.team2.get_legendary_creatures():
+                            curr_moving_legendary_creature: LegendaryCreature = curr_battle.whose_turn
+                            chance: float = random.random()
+                            trainer_battle_action: str = "NORMAL ATTACK" if chance <= 1 / 3 else \
+                                "NORMAL HEAL" if 1 / 3 < chance <= 2 / 3 else "USE SKILL"
+                            usable_skills: list = [skill for skill in curr_battle.whose_turn.get_skills()
+                                                   if curr_battle.whose_turn.curr_magic_points >=
+                                                   skill.magic_points_cost and isinstance(skill, ActiveSkill)]
+
+                            # If there are no usable skills and 'trainer_battle_action' is set to "USE SKILL",
+                            # change the value of 'trainer_battle_action'
+                            if len(usable_skills) == 0:
+                                trainer_battle_action = "NORMAL ATTACK" if random.random() < 0.5 else "NORMAL HEAL"
+
+                            if trainer_battle_action == "NORMAL ATTACK":
+                                # A normal attack occurs
+                                moving_legendary_creature: LegendaryCreature = curr_battle.whose_turn
+                                target: LegendaryCreature = curr_battle.team1.get_legendary_creatures() \
+                                    [random.randint(0, len(curr_battle.team1.get_legendary_creatures()) - 1)]
+                                moving_legendary_creature.have_turn(target, None, trainer_battle_action)
+                                if random.random() < target.counterattack_chance + \
+                                        target.counterattack_chance_up:
+                                    target.counterattack(moving_legendary_creature)
+                            elif trainer_battle_action == "NORMAL HEAL":
+                                # A normal heal occurs
+                                moving_legendary_creature: LegendaryCreature = curr_battle.whose_turn
+                                target: LegendaryCreature = curr_battle.team2.get_legendary_creatures() \
+                                    [random.randint(0, len(curr_battle.team2.get_legendary_creatures()) - 1)]
+                                moving_legendary_creature.have_turn(target, None, trainer_battle_action)
+                            elif trainer_battle_action == "USE SKILL":
+                                # A skill is used
+                                moving_legendary_creature: LegendaryCreature = curr_battle.whose_turn
+                                skill_to_use: ActiveSkill = usable_skills[random.randint(0, len(usable_skills) - 1)]
+                                if skill_to_use.active_skill_type == "ATTACK" or \
+                                        skill_to_use.active_skill_type == "ENEMIES EFFECT":
+                                    target: LegendaryCreature = curr_battle.team1.get_legendary_creatures() \
+                                        [random.randint(0, len(curr_battle.team1.get_legendary_creatures()) - 1)]
+                                    moving_legendary_creature.have_turn(target, skill_to_use, trainer_battle_action)
+                                    if skill_to_use.active_skill_type == "ATTACK":
+                                        if random.random() < target.counterattack_chance + \
+                                                target.counterattack_chance_up:
+                                            target.counterattack(moving_legendary_creature)
+                                else:
+                                    target: LegendaryCreature = curr_battle.team2.get_legendary_creatures() \
+                                        [random.randint(0, len(curr_battle.team2.get_legendary_creatures()) - 1)]
+                                    moving_legendary_creature.have_turn(target, skill_to_use, trainer_battle_action)
+                            else:
+                                pass
+
+                            # Checking the case where the moving legendary creature gets an extra turn
+                            if random.random() < curr_moving_legendary_creature.extra_turn_chance + \
+                                    curr_moving_legendary_creature.extra_turn_chance_up and \
+                                    curr_moving_legendary_creature.can_move:
+                                curr_battle.whose_turn = curr_moving_legendary_creature
+
+                                # Recovering magic points
+                                curr_battle.whose_turn.recover_magic_points()
+                            else:
+                                curr_battle.get_someone_to_move()
+
+                        # Recovering magic points
+                        curr_battle.whose_turn.recover_magic_points()
+
+                    if curr_battle.winner == curr_battle.team1:
+                        print("Congratulations! You won the battle!")
+                        new_game.player_data.claim_reward(curr_battle.reward)
+                        current_stage.is_cleared = True
+
+                        # Checking whether the next stage is None or not. If yes, the player has cleared the level
+                        if chosen_level.next_stage(curr_stage_number) is None:
+                            new_game.player_data.claim_reward(chosen_level.clear_reward)
+                            chosen_level.is_cleared = True
+                            new_game.player_data.add_unlocked_level()
+                        else:
+                            # Move on to the next stage
+                            current_stage = chosen_level.next_stage(curr_stage_number)
+                            curr_stage_number += 1
+                    elif curr_battle.winner == curr_battle.team2:
+                        print("You lost the battle! Please come back stronger!")
+
+                    # Restore all legendary creatures
+                    curr_battle.team1.recover_all()
+                    curr_battle.team2.recover_all()
 
         print("Enter 'Y' for yes.")
         print("Enter anything else for no.")
