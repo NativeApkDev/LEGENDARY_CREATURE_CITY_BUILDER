@@ -43,7 +43,6 @@ def mp_battle(x: str, y: str):
     global win1
     global win2
     if x == "1":
-        global damage1
         user: LegendaryCreature = GameIG1.player_data.battle_team.get_legendary_creatures()[
             random.randint(0, len(GameIG1.player_data.battle_team.get_legendary_creatures()) - 1)
         ]
@@ -59,7 +58,6 @@ def mp_battle(x: str, y: str):
         print(str(user.name) + " dealt " + str(damage1) + " damage on " + str(target.name) + "!")
 
     if y == "1":
-        global damage2
         user: LegendaryCreature = GameIG2.player_data.battle_team.get_legendary_creatures()[
             random.randint(0, len(GameIG2.player_data.battle_team.get_legendary_creatures()) - 1)
         ]
@@ -86,12 +84,13 @@ def main():
     Main function of the server
     :return: None
     """
-    host: str = "10.11.250.207"  # IP address of the host
+    local_ip: str = socket.gethostbyname('localhost')
+    host: str = local_ip  # IP address of the host
     port: int = 5555  # port number
     global win1
-    win1: int = 0
+    win1 = 0
     global win2
-    win2: int = 0
+    win2 = 0
 
     game_socket: socket.socket = socket.socket()
     game_socket.bind((host, port))
@@ -104,10 +103,10 @@ def main():
 
     data1: bytes = c1.recv(1024)
     global GameIG1
-    GameIG1: Game = pickle.loads(data1)
+    GameIG1 = pickle.loads(data1)  # Game type
     data2: bytes = c2.recv(1024)
     global GameIG2
-    GameIG2: Game = pickle.loads(data2)
+    GameIG2 = pickle.loads(data2)  # Game type
     c1.send(data2)
     c2.send(data1)
 
