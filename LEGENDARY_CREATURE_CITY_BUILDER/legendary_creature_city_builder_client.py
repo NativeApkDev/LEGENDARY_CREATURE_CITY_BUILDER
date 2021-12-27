@@ -11,8 +11,7 @@ The game "Legendary Creature City Builder" is inspired by "Dragon City"
 
 
 # Importing necessary libraries
-
-
+import socket
 import sys
 import uuid
 import pickle
@@ -4191,35 +4190,6 @@ class Game:
         return copy.deepcopy(self)
 
 
-class MultiplayerMode:
-    """
-    This class contains attributes of multiplayer mode in the game.
-    """
-
-    def __init__(self, game1, game2):
-        # type: (Game, Game) -> None
-        self.game1: Game = game1
-        self.game2: Game = game2
-
-    def __str__(self):
-        # type: () -> str
-        res: str = str(type(self).__name__) + "("  # initial value
-        index: int = 0  # initial value
-        for item in vars(self).items():
-            res += str(item[0]) + "=" + str(item[1])
-
-            if index < len(vars(self).items()) - 1:
-                res += ", "
-
-            index += 1
-
-        return res + ")"
-
-    def clone(self):
-        # type: () -> MultiplayerMode
-        return copy.deepcopy(self)
-
-
 ###########################################
 # VERSION 2 FEATURES (DRAFT CODE)
 ###########################################
@@ -4382,6 +4352,127 @@ class Message:
 ###########################################
 
 
+# Global variables
+# 1. The item shop
+runes: list = []  # initial value
+for rating in range(Rune.MIN_RATING, Rune.MAX_RATING + 1):
+    for slot_number in range(Rune.MIN_SLOT_NUMBER, Rune.MAX_SLOT_NUMBER + 1):
+        for set_name in Rune.POTENTIAL_SET_NAMES:
+            for main_stat in Rune.POTENTIAL_MAIN_STATS:
+                name: str = str(rating) + "-STAR " + str(set_name).upper() + " RUNE - SLOT " + str(slot_number)
+                description: str = str(set_name).upper() + " rune of rating " + str(rating) + " at slot " + \
+                                    str(slot_number)
+                gold_cost: mpf = mpf("10") ** (6 + 5 * (rating - 1))
+                gem_cost: mpf = 0 if rating == 1 else 10 * triangular(rating)
+                new_rune: Rune = Rune(name, description, gold_cost, gem_cost, rating, slot_number, set_name,
+                                        main_stat)
+                runes.append(new_rune)
+
+eggs: list = []  # initial value
+for element in Egg.POTENTIAL_ELEMENTS:
+    new_egg: Egg = Egg(mpf("1e6"), mpf("10"), element)
+    eggs.append(new_egg)
+
+awaken_shards: list = []  # initial value
+for element in Egg.POTENTIAL_ELEMENTS:
+    new_awaken_shard: AwakenShard = AwakenShard(mpf("1e6"), mpf("10"), element)
+    awaken_shards.append(new_awaken_shard)
+
+items: list = [rune for rune in runes] + [egg for egg in eggs] + \
+                [awaken_shard for awaken_shard in awaken_shards]
+items = items + [EXPShard(mpf("1e6"), mpf("10"), mpf("1e5")),
+                    LevelUpShard(mpf("1e6"), mpf("10")),
+                    SkillLevelUpShard(mpf("1e6"), mpf("10"))]
+item_shop: ItemShop = ItemShop(items)
+
+# 2. The building shop
+habitats: list = []  # initial value
+for element in Egg.POTENTIAL_ELEMENTS:
+    new_habitat: Habitat = Habitat(mpf("1e5"), mpf("1"), element, mpf("1e3"))
+    habitats.append(new_habitat)
+
+building_shop: BuildingShop = BuildingShop([
+                                                Hatchery(mpf("1e5"), mpf("1")),
+                                                TrainingArea(mpf("1e8"), mpf("1000")),
+                                                Tree(mpf("1e4"), mpf("0")),
+                                                Guardstone(mpf("1e7"), mpf("100")),
+                                                LegendaryCreatureSanctuary(mpf("1e7"), mpf("100")),
+                                                SurvivalAltar(mpf("1e7"), mpf("100")),
+                                                MagicAltar(mpf("1e7"), mpf("100")),
+                                                BoosterTower(mpf("1e7"), mpf("100")),
+                                                PlayerEXPTower(mpf("1e7"), mpf("100")),
+                                                FoodFarm(mpf("1e6"), mpf("10")),
+                                                GoldMine(mpf("1e6"), mpf("10")),
+                                                GemMine(mpf("1e6"), mpf("10")),
+                                                PowerUpCircle(mpf("1e5"), mpf("1")),
+                                                FusionCenter(mpf("1e8"), mpf("1000")),
+                                                TempleOfWishes(mpf("1e5"), mpf("1"),
+                                                                  [Reward(player_reward_exp=mpf("1e6")),
+                                                                   Reward(player_reward_exp=mpf("5e6")),
+                                                                   Reward(player_reward_gold=mpf("1e5")),
+                                                                   Reward(player_reward_gold=mpf("5e5")),
+                                                                   Reward(player_reward_gems=mpf("10")),
+                                                                   Reward(player_reward_gems=mpf("50")),
+                                                                   Reward(legendary_creature_reward_exp=mpf("1e6")),
+                                                                   Reward(legendary_creature_reward_exp=mpf("5e6"))
+                                                                   ] + [item for item in items])
+                                               ] + [habitat for habitat in habitats])
+
+# 3. Initialising potential CPU players the player can face
+potential_cpu_players: list = [
+        CPU("CPU #1"),
+        CPU("CPU #2"),
+        CPU("CPU #3"),
+        CPU("CPU #4"),
+        CPU("CPU #5"),
+        CPU("CPU #6"),
+        CPU("CPU #7"),
+        CPU("CPU #8"),
+        CPU("CPU #9"),
+        CPU("CPU #10")
+]
+
+index: int = 1  # initial value
+for cpu_player in potential_cpu_players:
+    assert isinstance(cpu_player, CPU), "Invalid argument in list 'potential_cpu_players'!"
+    cpu_player.battle_team = Team([generate_random_legendary_creature(
+        Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+    ),
+        generate_random_legendary_creature(
+            Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+        ),
+            generate_random_legendary_creature(
+                Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+            ),
+            generate_random_legendary_creature(
+                Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+            ),
+            generate_random_legendary_creature(
+                Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
+            )])
+    level_ups: int = 5 * index
+    for legendary_creature in cpu_player.battle_team.get_legendary_creatures():
+        for k in range(level_ups):
+            legendary_creature.exp = legendary_creature.required_exp
+            legendary_creature.level_up()
+            if legendary_creature.level == legendary_creature.max_level:
+                legendary_creature.evolve()
+
+    index += 1
+
+# 4. The battle arena
+battle_arena: Arena = Arena(potential_cpu_players)
+
+# 5. Minigames the player can play in
+minigames: list = [
+    Minigame("BOX EATS PLANTS"), Minigame("MATCH WORD PUZZLE"), Minigame("MATCH-3 GAME"), Minigame("DAILY BONUS")
+]
+
+
+# 6. GameIG
+GameIG: Game = Game(Player("guest"), item_shop, building_shop, battle_arena, minigames)  # initial value
+
+
 # Creating the main method used to runt the game.
 
 
@@ -4402,122 +4493,6 @@ def main() -> int:
     ancient_world_elements: list = ["BEAUTY", "MAGIC", "CHAOS", "HAPPY", "DREAM", "SOUL"]
     for i in range(0, len(ancient_world_elements)):
         print(str(i + 1) + ". " + str(ancient_world_elements[i]))
-
-    # Initialising important variables to be used throughout the main function.
-    # 1. The item shop
-    runes: list = []  # initial value
-    for rating in range(Rune.MIN_RATING, Rune.MAX_RATING + 1):
-        for slot_number in range(Rune.MIN_SLOT_NUMBER, Rune.MAX_SLOT_NUMBER + 1):
-            for set_name in Rune.POTENTIAL_SET_NAMES:
-                for main_stat in Rune.POTENTIAL_MAIN_STATS:
-                    name: str = str(rating) + "-STAR " + str(set_name).upper() + " RUNE - SLOT " + str(slot_number)
-                    description: str = str(set_name).upper() + " rune of rating " + str(rating) + " at slot " + \
-                                       str(slot_number)
-                    gold_cost: mpf = mpf("10") ** (6 + 5 * (rating - 1))
-                    gem_cost: mpf = 0 if rating == 1 else 10 * triangular(rating)
-                    new_rune: Rune = Rune(name, description, gold_cost, gem_cost, rating, slot_number, set_name,
-                                          main_stat)
-                    runes.append(new_rune)
-
-    eggs: list = []  # initial value
-    for element in Egg.POTENTIAL_ELEMENTS:
-        new_egg: Egg = Egg(mpf("1e6"), mpf("10"), element)
-        eggs.append(new_egg)
-
-    awaken_shards: list = []  # initial value
-    for element in Egg.POTENTIAL_ELEMENTS:
-        new_awaken_shard: AwakenShard = AwakenShard(mpf("1e6"), mpf("10"), element)
-        awaken_shards.append(new_awaken_shard)
-
-    items: list = [rune for rune in runes] + [egg for egg in eggs] + \
-                  [awaken_shard for awaken_shard in awaken_shards]
-    items = items + [EXPShard(mpf("1e6"), mpf("10"), mpf("1e5")),
-                     LevelUpShard(mpf("1e6"), mpf("10")),
-                     SkillLevelUpShard(mpf("1e6"), mpf("10"))]
-    item_shop: ItemShop = ItemShop(items)
-
-    # 2. The building shop
-    habitats: list = []  # initial value
-    for element in Egg.POTENTIAL_ELEMENTS:
-        new_habitat: Habitat = Habitat(mpf("1e5"), mpf("1"), element, mpf("1e3"))
-        habitats.append(new_habitat)
-
-    building_shop: BuildingShop = BuildingShop([
-                                                   Hatchery(mpf("1e5"), mpf("1")),
-                                                   TrainingArea(mpf("1e8"), mpf("1000")),
-                                                   Tree(mpf("1e4"), mpf("0")),
-                                                   Guardstone(mpf("1e7"), mpf("100")),
-                                                   LegendaryCreatureSanctuary(mpf("1e7"), mpf("100")),
-                                                   SurvivalAltar(mpf("1e7"), mpf("100")),
-                                                   MagicAltar(mpf("1e7"), mpf("100")),
-                                                   BoosterTower(mpf("1e7"), mpf("100")),
-                                                   PlayerEXPTower(mpf("1e7"), mpf("100")),
-                                                   FoodFarm(mpf("1e6"), mpf("10")),
-                                                   GoldMine(mpf("1e6"), mpf("10")),
-                                                   GemMine(mpf("1e6"), mpf("10")),
-                                                   PowerUpCircle(mpf("1e5"), mpf("1")),
-                                                   FusionCenter(mpf("1e8"), mpf("1000")),
-                                                   TempleOfWishes(mpf("1e5"), mpf("1"),
-                                                                  [Reward(player_reward_exp=mpf("1e6")),
-                                                                   Reward(player_reward_exp=mpf("5e6")),
-                                                                   Reward(player_reward_gold=mpf("1e5")),
-                                                                   Reward(player_reward_gold=mpf("5e5")),
-                                                                   Reward(player_reward_gems=mpf("10")),
-                                                                   Reward(player_reward_gems=mpf("50")),
-                                                                   Reward(legendary_creature_reward_exp=mpf("1e6")),
-                                                                   Reward(legendary_creature_reward_exp=mpf("5e6"))
-                                                                   ] + [item for item in items])
-                                               ] + [habitat for habitat in habitats])
-
-    # 3. Initialising potential CPU players the player can face
-    potential_cpu_players: list = [
-        CPU("CPU #1"),
-        CPU("CPU #2"),
-        CPU("CPU #3"),
-        CPU("CPU #4"),
-        CPU("CPU #5"),
-        CPU("CPU #6"),
-        CPU("CPU #7"),
-        CPU("CPU #8"),
-        CPU("CPU #9"),
-        CPU("CPU #10")
-    ]
-
-    index: int = 1  # initial value
-    for cpu_player in potential_cpu_players:
-        assert isinstance(cpu_player, CPU), "Invalid argument in list 'potential_cpu_players'!"
-        cpu_player.battle_team = Team([generate_random_legendary_creature(
-            Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
-        ),
-            generate_random_legendary_creature(
-                Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
-            ),
-            generate_random_legendary_creature(
-                Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
-            ),
-            generate_random_legendary_creature(
-                Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
-            ),
-            generate_random_legendary_creature(
-                Egg.POTENTIAL_ELEMENTS[random.randint(0, len(Egg.POTENTIAL_ELEMENTS) - 1)]
-            )])
-        level_ups: int = 5 * index
-        for legendary_creature in cpu_player.battle_team.get_legendary_creatures():
-            for k in range(level_ups):
-                legendary_creature.exp = legendary_creature.required_exp
-                legendary_creature.level_up()
-                if legendary_creature.level == legendary_creature.max_level:
-                    legendary_creature.evolve()
-
-        index += 1
-
-    # 4. The battle arena
-    battle_arena: Arena = Arena(potential_cpu_players)
-
-    # 5. Minigames the player can play in
-    minigames: list = [
-        Minigame("BOX EATS PLANTS"), Minigame("MATCH WORD PUZZLE"), Minigame("MATCH-3 GAME"), Minigame("DAILY BONUS")
-    ]
 
     # Initialising variable for the saved game data
     # Asking the user to enter his/her name to check whether saved game data exists or not
@@ -4540,6 +4515,8 @@ def main() -> int:
         name: str = input("Please enter your name: ")
         player_data: Player = Player(name)
         new_game = Game(player_data, item_shop, building_shop, battle_arena, minigames)
+        global GameIG
+        GameIG = new_game
 
     # Getting the current date and time
     old_now: datetime = datetime.now()
@@ -5023,7 +5000,8 @@ def main() -> int:
                 # Clearing the command line window
                 clear()
 
-                # TODO: add code for multiplayer battle
+                mp_main()
+
             elif action == "PLAY MINIGAME":
                 # Clearing the command line window
                 clear()
@@ -6730,6 +6708,80 @@ def main() -> int:
     # Saving game data and quitting the game.
     save_game_data(new_game, file_name)
     return 0
+
+
+# Creating additional functions for multiplayer game mode.
+
+
+def mp_main():
+    """
+    The following code for multiplayer battle is inspired by the YouTube video in the following source.
+    https://www.youtube.com/watch?v=2klJP0DEsJg
+    """
+    host: str = "10.11.250.207"  # IP address of the host
+    port: int = 5555  # port number
+    game_socket: socket.socket = socket.socket()
+    game_socket.connect((host, port))
+    print("Waiting for other player to connect.")
+    global GameIG
+    player1_bytes: bytes = pickle.dumps(GameIG)
+    game_socket.send(player1_bytes)
+    player2_bytes: bytes = game_socket.recv(1024)
+    player2_game_data: Game = pickle.loads(player2_bytes)
+    while True:
+        mpinput = mp_format(GameIG.player_data.name, player2_game_data.player_data.name)
+        game_socket.send(mpinput.encode())
+        print("Waiting for other player to respond")
+        PlayerStatusBytes: bytes = game_socket.recv(1024)
+        PlayerStatus: list = pickle.loads(PlayerStatusBytes)
+        GameIG: Game = PlayerStatus[0]
+        player2_game_data = PlayerStatus[1]
+        if PlayerStatus[2] != 0:
+            if PlayerStatus[2] == 1:
+                mp_win(GameIG.player_data.name, game_socket)
+                
+                # The winner gains rewards in this game
+                enemy_battle_team: Team = player2_game_data.player_data.battle_team
+                reward: Reward = Reward(mpf("10") ** sum(legendary_creature.rating for legendary_creature
+                                                      in enemy_battle_team.get_legendary_creatures()),
+                                     mpf("10") ** (sum(legendary_creature.rating for legendary_creature
+                                                       in enemy_battle_team.get_legendary_creatures()) - 2),
+                                     mpf("10") ** (sum(legendary_creature.rating for legendary_creature
+                                                       in enemy_battle_team.get_legendary_creatures()) - 5),
+                                     mpf("10") ** sum(legendary_creature.rating for legendary_creature
+                                                      in enemy_battle_team.get_legendary_creatures()))
+                GameIG.player_data.claim_reward(reward)
+
+            elif PlayerStatus[2] == 2:
+                mp_lose(GameIG.player_data.name, game_socket)
+
+            # Saving game data and quitting the game.
+            save_game_data(GameIG,
+                           "SAVED LEGENDARY CREATURE CITY BUILDER GAME DATA - " +
+                           str(GameIG.player_data.name).upper())
+            sys.exit()
+
+
+def mp_format(player_name: str, opponent_name: str):
+    print("--------------------" + str(player_name) + " VS. " + str(opponent_name) + "--------------------")
+    print("Enter '1' to Attack")
+    mpinput: str = input("-> ")
+    if mpinput != "1":
+        mp_format(player_name, opponent_name)
+    else:
+        return mpinput
+
+
+def mp_win(opponent_name, game_socket):
+    # type: (str, socket.socket) -> None
+    print("You have defeated " + str(opponent_name))
+    game_socket.close()
+
+
+def mp_lose(opponent_name, game_socket):
+    # type: (str, socket.socket) -> None
+    print("You have lost to " + str(opponent_name))
+    game_socket.close()
 
 
 if __name__ == '__main__':

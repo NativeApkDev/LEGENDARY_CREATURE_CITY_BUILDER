@@ -1,4 +1,4 @@
-1. Version 1 (Estimated Release Date: January 2022):
+1. Version 1 (Release Date: Tuesday, 28 December 2021):
 - Allows online multiplayer battles.
 - The players can build on their cities and grow legendary creatures.
 - The item shop sells eggs for all possible elements of legendary creatures.
