@@ -39,7 +39,7 @@ class Minigame:
 
     def __init__(self, name):
         # type: (str) -> None
-        self.name: str = name
+        self.name: str = name if name in self.POSSIBLE_NAMES else self.POSSIBLE_NAMES[0]
         self.already_played: bool = False
 
     def reset(self):
@@ -500,6 +500,15 @@ class MatchWordPuzzleBoard:
 
             self.__tiles.append(new)
 
+    def all_opened(self):
+        # type: () -> bool
+        for i in range(self.BOARD_HEIGHT):
+            for j in range(self.BOARD_WIDTH):
+                if self.__tiles[i][j].is_closed:
+                    return False
+
+        return True
+
     def get_tile_at(self, x, y):
         # type: (int, int) -> MatchWordPuzzleTile or None
         if x < 0 or x >= self.BOARD_WIDTH or y < 0 or y >= self.BOARD_HEIGHT:
@@ -525,11 +534,9 @@ class MatchWordPuzzleTile:
     """
 
     POSSIBLE_KEYWORDS: list = ["AND", "AS", "ASSERT", "BREAK", "CLASS", "CONTINUE", "DEF", "DEL", "ELIF", "ELSE",
-                               "EXCEPT",
-                               "FALSE", "FINALLY", "FOR", "FROM", "GLOBAL", "IF", "IMPORT", "IN", "IS", "LAMBDA",
-                               "NONE",
-                               "NONLOCAL", "NOT", "OR", "PASS", "RAISE", "RETURN", "TRUE", "TRY", "WHILE", "WITH",
-                               "YIELD"]
+                               "EXCEPT", "FALSE", "FINALLY", "FOR", "FROM", "GLOBAL", "IF", "IMPORT", "IN", "IS",
+                               "LAMBDA", "NONE", "NONLOCAL", "NOT", "OR", "PASS", "RAISE", "RETURN", "TRUE",
+                               "TRY", "WHILE", "WITH", "YIELD"]
 
     def __init__(self, contents):
         # type: (str) -> None
@@ -596,6 +603,41 @@ class MatchThreeBoard:
 
         self.__matches: list = []  # initial value
 
+    def swap_tiles(self, x1, y1, x2, y2):
+        # type: (int, int, int, int) -> bool
+        if self.get_tile_at(x1, y1) is None or self.get_tile_at(x2, y2) is None:
+            return False
+
+        temp: MatchThreeTile = self.__tiles[y1][x1]
+        self.__tiles[y1][x1] = self.__tiles[y2][x2]
+        self.__tiles[y2][x2] = temp
+        return True
+
+    def no_possible_moves(self):
+        # type: () -> bool
+        # Trying all possible moves and checking whether it has matches or not
+        for j in range(self.BOARD_WIDTH):
+            for i in range(self.BOARD_HEIGHT - 1):
+                new_board: MatchThreeBoard = self.clone()
+                temp: MatchThreeTile = new_board.__tiles[i][j]
+                new_board.__tiles[i][j] = new_board.__tiles[i + 1][j]
+                new_board.__tiles[i + 1][j] = temp
+                matches: list = new_board.check_matches()
+                if len(matches) > 0:
+                    return False
+
+        for i in range(self.BOARD_HEIGHT):
+            for j in range(self.BOARD_WIDTH - 1):
+                new_board: MatchThreeBoard = self.clone()
+                temp: MatchThreeTile = new_board.__tiles[i][j]
+                new_board.__tiles[i][j] = new_board.__tiles[i][j + 1]
+                new_board.__tiles[i][j + 1] = temp
+                matches: list = new_board.check_matches()
+                if len(matches) > 0:
+                    return False
+
+        return True
+
     def check_matches(self):
         # type: () -> list
         self.__matches = []  # initial value
@@ -630,6 +672,8 @@ class MatchThreeBoard:
         for match in self.__matches:
             for position in match:
                 self.__tiles[position[0]][position[1]].contents = "NONE"
+
+        self.__matches = []
 
     def fill_board(self):
         # type: () -> None
@@ -674,11 +718,7 @@ class MatchThreeTile:
     """
 
     POSSIBLE_KEYWORDS: list = ["AND", "AS", "ASSERT", "BREAK", "CLASS", "CONTINUE", "DEF", "DEL", "ELIF", "ELSE",
-                               "EXCEPT",
-                               "FALSE", "FINALLY", "FOR", "FROM", "GLOBAL", "IF", "IMPORT", "IN", "IS", "LAMBDA",
-                               "NONE",
-                               "NONLOCAL", "NOT", "OR", "PASS", "RAISE", "RETURN", "TRUE", "TRY", "WHILE", "WITH",
-                               "YIELD"]
+                               "EXCEPT", "FALSE", "FINALLY", "FOR", "FROM", "GLOBAL"]
 
     def __init__(self, contents):
         # type: (str) -> None
@@ -691,7 +731,6 @@ class MatchThreeTile:
     def clone(self):
         # type: () -> MatchThreeTile
         return copy.deepcopy(self)
-
 
 ###########################################
 # MATCH-3 GAME

@@ -21,6 +21,8 @@ import random
 from datetime import datetime, timedelta
 import os
 from functools import reduce
+
+from LEGENDARY_CREATURE_CITY_BUILDER.minigames import Plant
 from minigames import *
 
 from mpmath import mp, mpf
@@ -4611,7 +4613,6 @@ def main() -> int:
         print("Enter 'BUY ITEM' to purchase an item from the item shop.")
         print("Enter 'VIEW STATS' to view your stats.")
         action: str = input("What do you want to do? ")
-        # TODO: add code for each functionality in the main function.
         if action not in allowed:
             # Saving game data and quitting the game
             save_game_data(new_game, file_name)
@@ -5043,7 +5044,281 @@ def main() -> int:
 
                 chosen_minigame: Minigame = new_game.get_minigames()[minigame_index - 1]
 
-                # TODO: add code to play chosen minigame
+                # Getting the player to play the chosen minigame
+                if chosen_minigame.name == "BOX EATS PLANTS":
+                    print("Welcome to 'Box Eats Plants'.")
+                    print("Your goal in this game is to get the box to eat as many plants as possible ")
+                    print("while avoiding rocks.")
+                    # Set up the minigame "Box Eats Plants"
+                    score: int = 0  # initial value
+                    game_over: bool = False  # initial value
+                    board: BoxEatsPlantsBoard = BoxEatsPlantsBoard()
+                    box: Box = Box(0, 0)  # initial value
+                    rocks: list = []
+                    plants: list = []
+                    while board.num_rocks() < 5:
+                        rocks.append(board.spawn_rock())
+
+                    while board.num_plants() < 5:
+                        plants.append(board.spawn_plant())
+
+                    while board.num_boxes() < 1:
+                        box = board.spawn_box()
+
+                    while not game_over:
+                        # Clearing the command line window
+                        clear()
+
+                        # Show the current progress of the game
+                        print("Below is the current representation of the board.\n" + str(board))
+                        print("Current coordinates of box: (" + str(box.x) + ", " + str(box.y) + ").")
+                        print("Your score: " + str(score))
+                        allowed: list = ["UP", "DOWN", "LEFT", "RIGHT"]
+                        print("Enter 'UP' to move box up.")
+                        print("Enter 'DOWN' to move box down.")
+                        print("Enter 'LEFT' to move box left.")
+                        print("Enter 'RIGHT' to move box right.")
+                        direction: str = input("Where do you want to move the box to? ")
+                        while direction not in allowed:
+                            print("Enter 'UP' to move box up.")
+                            print("Enter 'DOWN' to move box down.")
+                            print("Enter 'LEFT' to move box left.")
+                            print("Enter 'RIGHT' to move box right.")
+                            direction = input("Sorry, invalid input! Where do you want to move the box to? ")
+
+                        if direction == "UP":
+                            box.move_up(board)
+                        elif direction == "DOWN":
+                            box.move_down(board)
+                        elif direction == "LEFT":
+                            box.move_left(board)
+                        else:
+                            box.move_right(board)
+
+                        box_tile: BoxEatsPlantsTile = board.get_tile_at(box.x, box.y)
+                        if box_tile.rock is not None:
+                            game_over = True
+
+                        if isinstance(box_tile.plant, Plant):
+                            score += 1
+                            plants.remove(box_tile.plant)
+                            box_tile.remove_plant()
+                            plants.append(board.spawn_plant())
+
+                        rock_direction: str = allowed[random.randint(0, 3)]
+                        if rock_direction == "UP":
+                            for rock in rocks:
+                                rock.move_up(board)
+                                rock_tile: BoxEatsPlantsTile = board.get_tile_at(rock.x, rock.y)
+                                if isinstance(rock_tile.box, Box):
+                                    game_over = True
+
+                        elif rock_direction == "DOWN":
+                            for rock in rocks:
+                                rock.move_down(board)
+                                rock_tile: BoxEatsPlantsTile = board.get_tile_at(rock.x, rock.y)
+                                if isinstance(rock_tile.box, Box):
+                                    game_over = True
+
+                        elif rock_direction == "LEFT":
+                            for rock in rocks:
+                                rock.move_left(board)
+                                rock_tile: BoxEatsPlantsTile = board.get_tile_at(rock.x, rock.y)
+                                if isinstance(rock_tile.box, Box):
+                                    game_over = True
+
+                        else:
+                            for rock in rocks:
+                                rock.move_right(board)
+                                rock_tile: BoxEatsPlantsTile = board.get_tile_at(rock.x, rock.y)
+                                if isinstance(rock_tile.box, Box):
+                                    game_over = True
+
+                        plant_direction: str = allowed[random.randint(0, 3)]
+                        if plant_direction == "UP":
+                            for plant in plants:
+                                plant.move_up(board)
+                                plant_tile: BoxEatsPlantsTile = board.get_tile_at(plant.x, plant.y)
+                                if isinstance(plant_tile.box, Box):
+                                    score += 1
+                                    plants.remove(plant)
+                                    plant_tile.remove_plant()
+                                    plants.append(board.spawn_plant())
+
+                        elif plant_direction == "DOWN":
+                            for plant in plants:
+                                plant.move_down(board)
+                                plant_tile: BoxEatsPlantsTile = board.get_tile_at(plant.x, plant.y)
+                                if isinstance(plant_tile.box, Box):
+                                    score += 1
+                                    plants.remove(plant)
+                                    plant_tile.remove_plant()
+                                    plants.append(board.spawn_plant())
+
+                        elif plant_direction == "LEFT":
+                            for plant in plants:
+                                plant.move_left(board)
+                                plant_tile: BoxEatsPlantsTile = board.get_tile_at(plant.x, plant.y)
+                                if isinstance(plant_tile.box, Box):
+                                    score += 1
+                                    plants.remove(plant)
+                                    plant_tile.remove_plant()
+                                    plants.append(board.spawn_plant())
+
+                        else:
+                            for plant in plants:
+                                plant.move_right(board)
+                                plant_tile: BoxEatsPlantsTile = board.get_tile_at(plant.x, plant.y)
+                                if isinstance(plant_tile.box, Box):
+                                    score += 1
+                                    plants.remove(plant)
+                                    plant_tile.remove_plant()
+                                    plants.append(board.spawn_plant())
+
+                    # Clearing the command line window
+                    clear()
+
+                    # Generate reward for the player
+                    print("'BOX EATS PLANTS' GAME OVER! Your score is " + str(score))
+                    reward: Reward = Reward(player_reward_exp=mpf("10") ** score,
+                                            player_reward_gold=mpf("10") ** (score - 2),
+                                            legendary_creature_reward_exp=mpf("10") ** score)
+                    new_game.player_data.claim_reward(reward)
+
+                elif chosen_minigame.name == "MATCH WORD PUZZLE":
+                    print("Welcome to 'Match Word Puzzle'.")
+                    print("Your goal in this game is to match tiles on the board with the same word ")
+                    print("as fast as possible.")
+                    # Set up the minigame "Match Word Puzzle"
+                    start_time: datetime = datetime.now()
+                    board: MatchWordPuzzleBoard = MatchWordPuzzleBoard()
+                    while not board.all_opened():
+                        # Clearing the command line window
+                        clear()
+
+                        print("Below is the current representation of the board.\n" + str(board))
+                        print("You are required to enter the coordinates of the two tiles you want to "
+                              "open (the tiles must be different).")
+                        first_x: int = int(input("Please enter the x-coordinates of the first "
+                                                 "tile you want to open (1 - " + str(board.BOARD_WIDTH) + "): "))
+                        first_y: int = int(input("Please enter the y-coordinates of the first "
+                                                 "tile you want to open (1 - " + str(board.BOARD_HEIGHT) + "): "))
+                        while board.get_tile_at(first_x, first_y) is None:
+                            first_x = int(input("Sorry, invalid input! Please enter the x-coordinates of the first "
+                                                "tile you want to open (1 - " + str(board.BOARD_WIDTH) + "): "))
+                            first_y = int(input("Sorry, invalid input! Please enter the y-coordinates of the first "
+                                                "tile you want to open (1 - " + str(board.BOARD_HEIGHT) + "): "))
+
+                        first_tile: MatchWordPuzzleTile = board.get_tile_at(first_x, first_y)
+                        second_x: int = int(input("Please enter the x-coordinates of the second "
+                                                 "tile you want to open (1 - " + str(board.BOARD_WIDTH) + "): "))
+                        second_y: int = int(input("Please enter the y-coordinates of the second "
+                                                 "tile you want to open (1 - " + str(board.BOARD_HEIGHT) + "): "))
+                        while board.get_tile_at(second_x, second_y) is None or \
+                            (first_x == second_x and first_y == second_y):
+                            second_x: int = int(input("Sorry, invalid input! Please enter the x-coordinates "
+                                                      "of the second "
+                                                      "tile you want to open (1 - " + str(board.BOARD_WIDTH) + "): "))
+                            second_y: int = int(input("Sorry, invalid input! Please enter the y-coordinates "
+                                                      "of the second "
+                                                      "tile you want to open (1 - " + str(board.BOARD_HEIGHT) + "): "))
+
+                        second_tile: MatchWordPuzzleTile = board.get_tile_at(second_x, second_y)
+
+                        # If the contents of both of the tiles selected are equal, open both tiles.
+                        if first_tile.contents == second_tile.contents:
+                            first_tile.open()
+                            second_tile.open()
+
+                    finish_time: datetime = datetime.now()
+                    seconds_elapsed: int = (finish_time - start_time).seconds
+                    reward: Reward = Reward(player_reward_exp=mpf("1e24") / seconds_elapsed,
+                                            player_reward_gold=mpf("1e22") / seconds_elapsed,
+                                            legendary_creature_reward_exp=mpf("1e24") / seconds_elapsed)
+                    new_game.player_data.claim_reward(reward)
+
+                elif chosen_minigame.name == "MATCH-3 GAME":
+                    print("Welcome to 'Match-3 Game'.")
+                    print("Your goal in this game is to break at least 60 tiles from 15 moves.")
+                    # Set up the minigame "Match-3 Game"
+                    max_moves: int = 15
+                    min_broken_tiles: int = 60
+                    curr_broken_tiles: int = 0  # initial value
+                    curr_moves: int = 0  # initial value
+                    curr_board: MatchThreeBoard = MatchThreeBoard()
+
+                    # Re-initialise the board if there are no possible moves.
+                    while curr_board.no_possible_moves():
+                        curr_board = MatchThreeBoard()
+
+                    while curr_moves < max_moves:
+                        # Clearing the command line window
+                        clear()
+
+                        print("Below is the current representation of the board.\n" + str(curr_board))
+                        print("You are required to enter the coordinates of the two tiles you want to "
+                              "swap (the tiles must be next to each other).")
+                        first_x: int = int(input("Please enter the x-coordinates of the first "
+                                                 "tile you want to swap (1 - " + str(curr_board.BOARD_WIDTH) + "): "))
+                        first_y: int = int(input("Please enter the y-coordinates of the first "
+                                                 "tile you want to swap (1 - " + str(curr_board.BOARD_HEIGHT) + "): "))
+                        while curr_board.get_tile_at(first_x, first_y) is None:
+                            first_x = int(input("Sorry, invalid input! Please enter the x-coordinates of the first "
+                                                     "tile you want to swap (1 - " + str(curr_board.BOARD_WIDTH) + "): "))
+                            first_y = int(input("Sorry, invalid input! Please enter the y-coordinates of the first "
+                                                     "tile you want to swap (1 - " + str(curr_board.BOARD_HEIGHT) + "): "))
+
+                        second_x: int = int(input("Please enter the x-coordinates of the second "
+                                                 "tile you want to swap (1 - " + str(curr_board.BOARD_WIDTH) + "): "))
+                        second_y: int = int(input("Please enter the y-coordinates of the second "
+                                                 "tile you want to swap (1 - " + str(curr_board.BOARD_HEIGHT) + "): "))
+                        while curr_board.get_tile_at(second_x, second_y) is None or \
+                                abs(first_x - second_x) + abs(first_y - second_y) != 1:
+                            second_x = int(input("Sorry, invalid input! Please enter the x-coordinates of the second "
+                                                      "tile you want to swap (1 - " + str(curr_board.BOARD_WIDTH) + "): "))
+                            second_y = int(input("Sorry, invalid input! Please enter the y-coordinates of the second "
+                                                      "tile you want to swap (1 - " + str(curr_board.BOARD_HEIGHT) + "): "))
+
+                        new_board: MatchThreeBoard = curr_board.clone()
+                        new_board.swap_tiles(first_x, first_y, second_x, second_y)
+                        matches: list = new_board.check_matches()
+                        if len(matches) > 0:
+                            # Update the current representation of the board and remove all matches
+                            curr_board = new_board
+                            for match in matches:
+                                curr_broken_tiles += len(match)
+
+                            curr_moves += 1
+                            curr_board.clear_matches()
+                            curr_board.fill_board()
+
+                        while len(curr_board.check_matches()) > 0:
+                            # Update the current representation of the board and remove all matches
+                            matches = curr_board.check_matches()
+                            for match in matches:
+                                curr_broken_tiles += len(match)
+
+                            curr_board.clear_matches()
+                            curr_board.fill_board()
+
+                        # Re-initialise the board if there are no possible moves.
+                        while curr_board.no_possible_moves():
+                            curr_board = MatchThreeBoard()
+
+                    # Checking whether the number of broken tiles reach the minimum required or not.
+                    # If yes, the player gains a reward.
+                    if curr_broken_tiles >= min_broken_tiles:
+                        print("Congratulations! You won the 'Match-3 Game'!")
+                        reward: Reward = Reward(player_reward_exp=mpf("10") **
+                                                                  (10 + curr_broken_tiles - min_broken_tiles),
+                                            player_reward_gold=mpf("10") **
+                                                                  (8 + curr_broken_tiles - min_broken_tiles),
+                                            legendary_creature_reward_exp=mpf("10") **
+                                                                  (10 + curr_broken_tiles - min_broken_tiles))
+                        new_game.player_data.claim_reward(reward)
+                    else:
+                        print("You lost! Better luck next time!")
+
             elif action == "REMOVE RUNE":
                 # Clearing up the command line window
                 clear()
@@ -6103,7 +6378,7 @@ def main() -> int:
                                             str(len(new_game.player_data.get_unlocked_levels())) + "): "))
 
                 chosen_level: Level = new_game.player_data.get_unlocked_levels()[level_index - 1]
-                
+
                 # Start the battle and battle until all stages are cleared
                 curr_stage_number: int = 0
                 current_stage: Stage = chosen_level.curr_stage(curr_stage_number)
