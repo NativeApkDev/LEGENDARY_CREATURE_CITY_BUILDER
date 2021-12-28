@@ -1476,41 +1476,6 @@ class Arena:
         return res + ")"
 
 
-class LiveArena:
-    """
-    This class contains attributes of a battle arena allowing live battle between two player in this game. In this case,
-    players take turn in making moves and the game pauses until the player makes a move.
-    """
-
-    def __init__(self, players_in_the_room=None):
-        # type: (list) -> None
-        if players_in_the_room is None:
-            players_in_the_room = []
-        self.__players_in_the_room: list = players_in_the_room  # initial value
-
-    def get_players_in_the_room(self):
-        # type: () -> list
-        return self.__players_in_the_room
-
-    def add_player_to_room(self, player):
-        # type: (Player) -> None
-        self.__players_in_the_room.append(player)
-
-    def __str__(self):
-        # type: () -> str
-        res: str = str(type(self).__name__) + "("  # initial value
-        index: int = 0  # initial value
-        for item in vars(self).items():
-            res += str(item[0]) + "=" + str(item[1])
-
-            if index < len(vars(self).items()) - 1:
-                res += ", "
-
-            index += 1
-
-        return res + ")"
-
-
 class Level:
     """
     This class contains attributes of a level for single player battles in this game.
@@ -1616,9 +1581,6 @@ class Player:
         self.arena_points: int = 1000
         self.arena_wins: int = 0
         self.arena_losses: int = 0
-        self.live_arena_points: int = 1000
-        self.live_arena_wins: int = 0
-        self.live_arena_losses: int = 0
         self.battle_team: Team = Team()
         self.item_inventory: ItemInventory = ItemInventory()
         self.legendary_creature_inventory: LegendaryCreatureInventory = LegendaryCreatureInventory()
@@ -6697,6 +6659,29 @@ def main() -> int:
                         print("LEGENDARY CREATURE #" + str(current_legendary_creature_index))
                         print(str(legendary_creature) + "\n")
                         current_legendary_creature_index += 1
+
+                    print("Enter 'Y' for yes.")
+                    print("Enter anything else for no.")
+                    change_leader: str = input("Do you want to change the leader of your team? ")
+                    if change_leader == "Y":
+                        legendary_creature_index: int = int(input("Please enter the index of the "
+                                                                  "legendary creature you want to set as "
+                                                                  "the leader of your battle team (1 - " +
+                                                                  str(len(new_game.player_data.
+                                                                          battle_team.get_legendary_creatures())) +
+                                                                  "): "))
+                        while legendary_creature_index < 1 or legendary_creature_index > \
+                                len(new_game.player_data.battle_team.get_legendary_creatures()):
+                            legendary_creature_index = int(input("Sorry, invalid input! Please enter the index of the "
+                                                                      "legendary creature you want to set as "
+                                                                      "the leader of your battle team (1 - " +
+                                                                      str(len(new_game.player_data.
+                                                                              battle_team.get_legendary_creatures())) +
+                                                                      "): "))
+
+                        new_leader: LegendaryCreature = new_game.player_data.battle_team.get_legendary_creatures() \
+                            [legendary_creature_index - 1]
+                        new_game.player_data.battle_team.set_leader(new_leader)
 
                     print("Enter 'Y' for yes.")
                     print("Enter anything else for no.")
