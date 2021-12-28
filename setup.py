@@ -27,8 +27,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "LEGENDARY_CREATURE_CITY_BUILDER=LEGENDARY_CREATURE_CITY_BUILDER.legendary_creature_city_builder_client:main",
-            "LEGENDARY_CREATURE_CITY_BUILDER=LEGENDARY_CREATURE_CITY_BUILDER.legendary_creature_city_builder_server:main"
+            "LEGENDARY_CREATURE_CITY_BUILDER=LEGENDARY_CREATURE_CITY_BUILDER.legendary_creature_city_builder:main",
         ]
     }
 )

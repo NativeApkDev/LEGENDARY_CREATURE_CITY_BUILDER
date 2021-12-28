@@ -1624,8 +1624,6 @@ class Player:
         self.legendary_creature_inventory: LegendaryCreatureInventory = LegendaryCreatureInventory()
         self.player_city: PlayerCity = PlayerCity()
         self.__unlocked_levels: list = []  # initial value
-        self.__friends: list = []  # initial value
-        self.friend_points: int = 0  # initial value
         self.add_unlocked_level()  # ensuring that the player has unlocked at least one level
 
     def __str__(self):
@@ -1660,7 +1658,8 @@ class Player:
             return False
 
         if hatchery.add_egg(egg):
-            egg.hatch_time = datetime.now() + timedelta(minutes=10)
+            # Make the egg hatch in 5 minutes
+            egg.hatch_time = datetime.now() + timedelta(minutes=5)
             egg.already_placed = True
             return True
         return False
@@ -1685,6 +1684,7 @@ class Player:
                 if egg.hatch_time is not None:
                     if datetime.now() >= egg.hatch_time:
                         # Initialise a random legendary creature
+                        hatchery.remove_egg(egg)
                         self.remove_item_from_inventory(egg)
                         new_legendary_creature: LegendaryCreature = generate_random_legendary_creature(egg.element)
                         self.add_legendary_creature(new_legendary_creature)
@@ -2392,33 +2392,6 @@ class Player:
         # type: () -> list
         return self.__unlocked_levels
 
-    def get_friends(self):
-        # type: () -> list
-        return self.__friends
-
-    def add_friend(self, friend):
-        # type: (Player) -> None
-        self.__friends.append(friend)
-
-    def remove_friend(self, friend):
-        # type: (Player) -> bool
-        if friend in self.__friends:
-            self.__friends.remove(friend)
-            return True
-        return False
-
-    def send_gift(self, friend):
-        # type: (Player) -> bool
-        if friend not in self.__friends:
-            return False
-
-        random_reward: Reward = Reward(mpf("10") ** random.randint(10, 20),
-                                       mpf("10") ** random.randint(7, 17),
-                                       mpf("10") ** random.randint(5, 15),
-                                       mpf("10") ** random.randint(10, 20))
-        self.friend_points += 10
-        friend.claim_reward(random_reward)
-
     def add_unlocked_level(self):
         # type: () -> None
         new_level_number: int = Level.LEVEL_NUMBER + 1
@@ -2631,9 +2604,13 @@ class Team:
     def add_legendary_creature(self, legendary_creature):
         # type: (LegendaryCreature) -> bool
         if len(self.__legendary_creatures) < self.MAX_LEGENDARY_CREATURES:
-            self.__legendary_creatures.append(legendary_creature)
-            self.set_leader()
-            return True
+            legendary_creature_ids: list = [creature.legendary_creature_id for creature
+                                            in self.__legendary_creatures]
+            if legendary_creature.legendary_creature_id not in legendary_creature_ids:
+                self.__legendary_creatures.append(legendary_creature)
+                self.set_leader()
+                return True
+            return False
         return False
 
     def remove_legendary_creature(self, legendary_creature):
@@ -4898,168 +4875,6 @@ class Game:
         return copy.deepcopy(self)
 
 
-###########################################
-# VERSION 2 FEATURES (DRAFT CODE)
-###########################################
-
-
-class Guild:
-    """
-    This class contains attributes of a guild where players can team-up for team battles in this game.
-    """
-
-    MAX_PLAYERS: int = 30
-
-    def __init__(self, name, players=None):
-        # type: (str, list) -> None
-        self.guild_id: str = str(uuid.uuid1())  # generating random guild ID
-        if players is None:
-            players = []
-        self.name: str = name
-        self.__players: list = players
-
-    def get_players(self):
-        # type: () -> list
-        return self.__players
-
-    def add_player(self, player):
-        # type: (Player) -> bool
-        if len(self.__players) < self.MAX_PLAYERS:
-            self.__players.append(player)
-            return True
-        return False
-
-    def remove_player(self, player):
-        # type: (Player) -> bool
-        if player in self.__players:
-            self.__players.remove(player)
-            return True
-        return False
-
-    def clone(self):
-        # type: () -> Guild
-        return copy.deepcopy(self)
-
-    def __str__(self):
-        # type: () -> str
-        res: str = str(type(self).__name__) + "("  # initial value
-        index: int = 0  # initial value
-        for item in vars(self).items():
-            res += str(item[0]) + "=" + str(item[1])
-
-            if index < len(vars(self).items()) - 1:
-                res += ", "
-
-            index += 1
-
-        return res + ")"
-
-
-class GuildBattle:
-    """
-    This class contains attributes of a battle between two guilds
-    """
-
-    def __init__(self, guild1, guild2):
-        # type: (Guild, Guild) -> None
-        self.guild1: Guild = guild1
-        self.guild2: Guild = guild2
-
-    def clone(self):
-        # type: () -> GuildBattle
-        return copy.deepcopy(self)
-
-    def __str__(self):
-        # type: () -> str
-        res: str = str(type(self).__name__) + "("  # initial value
-        index: int = 0  # initial value
-        for item in vars(self).items():
-            res += str(item[0]) + "=" + str(item[1])
-
-            if index < len(vars(self).items()) - 1:
-                res += ", "
-
-            index += 1
-
-        return res + ")"
-
-
-class Conversation:
-    """
-    This class contains attribute of a chat conversation between one player and another.
-    """
-
-    def __init__(self, player1, player2):
-        # type: (Player, Player) -> None
-        self.player1: Player = player1
-        self.player2: Player = player2
-        self.__messages: list = []  # initial value
-
-    def __str__(self):
-        # type: () -> str
-        res: str = str(type(self).__name__) + "("  # initial value
-        index: int = 0  # initial value
-        for item in vars(self).items():
-            res += str(item[0]) + "=" + str(item[1])
-
-            if index < len(vars(self).items()) - 1:
-                res += ", "
-
-            index += 1
-
-        return res + ")"
-
-    def get_messages(self):
-        # type: () -> list
-        return self.__messages
-
-    def add_message(self, message):
-        # type: (Message) -> bool
-        if message.sender not in [self.player1, self.player2]:
-            return False
-        self.__messages.append(message)
-        return True
-
-    def clone(self):
-        # type: () -> Conversation
-        return copy.deepcopy(self)
-
-
-class Message:
-    """
-    This class contains attributes of a message sent by a player in a conversation.
-    """
-
-    def __init__(self, sender, contents):
-        # type: (Player, str) -> None
-        self.time_sent: datetime = datetime.now()
-        self.sender: Player = sender
-        self.contents: str = contents
-
-    def __str__(self):
-        # type: () -> str
-        res: str = str(type(self).__name__) + "("  # initial value
-        index: int = 0  # initial value
-        for item in vars(self).items():
-            res += str(item[0]) + "=" + str(item[1])
-
-            if index < len(vars(self).items()) - 1:
-                res += ", "
-
-            index += 1
-
-        return res + ")"
-
-    def clone(self):
-        # type: () -> Message
-        return copy.deepcopy(self)
-
-
-###########################################
-# VERSION 2 FEATURES (DRAFT CODE)
-###########################################
-
-
 # Initialising global variables for the saved game data
 # 1. The item shop
 runes: list = []  # initial value
@@ -5078,7 +4893,7 @@ for rating in range(Rune.MIN_RATING, Rune.MAX_RATING + 1):
 
 eggs: list = []  # initial value
 for element in Egg.POTENTIAL_ELEMENTS:
-    new_egg: Egg = Egg(mpf("1e6"), mpf("10"), element)
+    new_egg: Egg = Egg(mpf("8e5"), mpf("8"), element)
     eggs.append(new_egg)
 
 awaken_shards: list = []  # initial value
@@ -5177,7 +4992,7 @@ minigames: list = [
 ]
 
 
-# Creating the main method used to runt the game.
+# Creating the main function used to run the game.
 
 
 def main() -> int:
@@ -5187,8 +5002,8 @@ def main() -> int:
     """
 
     print("Welcome to 'Legendary Creature City Builder' by 'NativeApkDev'.")
-    print("This game is an online multiplayer strategy and social-network RPG where the player raises legendary ")
-    print("creatures and brings them for multiplayer battles.")
+    print("This game is an offline strategy RPG where the player raises legendary ")
+    print("creatures and brings them for battles.")
     print("Below is the element chart in 'Legendary Creature City Builder'.\n")
     print(str(tabulate_element_chart()) + "\n")
     print("The following elements do not have any elemental strengths nor weaknesses.")
@@ -5219,8 +5034,6 @@ def main() -> int:
         name: str = input("Please enter your name: ")
         player_data: Player = Player(name)
         new_game = Game(player_data, item_shop, building_shop, battle_arena, minigames)
-        global GameIG
-        GameIG = new_game
 
     # Getting the current date and time
     old_now: datetime = datetime.now()
@@ -5271,7 +5084,7 @@ def main() -> int:
                          "FUSE LEGENDARY CREATURES", "PLACE EGG", "FEED LEGENDARY CREATURE",
                          "GIVE ITEM", "POWER UP LEGENDARY CREATURE", "EVOLVE LEGENDARY CREATURE",
                          "MANAGE HABITAT", "MANAGE TRAINING AREA", "PLACE RUNE", "REMOVE RUNE",
-                         "PLAY MINIGAME", "MULTIPLAYER BATTLE", "BATTLE ARENA", "BUY ITEM", "VIEW STATS"]
+                         "PLAY MINIGAME", "BATTLE ARENA", "BUY ITEM", "VIEW STATS"]
         print("Enter 'PLAY ADVENTURE MODE' to play in adventure mode.")
         print("Enter 'MANAGE PLAYER CITY' to manage your city.")
         print("Enter 'MANAGE BATTLE TEAM' to manage your battle team.")
@@ -5289,7 +5102,6 @@ def main() -> int:
         print("Enter 'PLACE RUNE' to place a rune on a legendary creature.")
         print("Enter 'REMOVE RUNE' to remove a rune from a legendary creature.")
         print("Enter 'PLAY MINIGAME' to play a minigame.")
-        print("Enter 'MULTIPLAYER BATTLE' to battle against another player.")
         print("Enter 'BATTLE ARENA' to battle against a CPU controlled player.")
         print("Enter 'BUY ITEM' to purchase an item from the item shop.")
         print("Enter 'VIEW STATS' to view your stats.")
@@ -5701,12 +5513,6 @@ def main() -> int:
                 curr_battle.team1.recover_all()
                 curr_battle.team2.recover_all()
 
-            elif action == "MULTIPLAYER BATTLE":
-                # Clearing the command line window
-                clear()
-
-                mp_main()
-
             elif action == "PLAY MINIGAME":
                 # Clearing the command line window
                 clear()
@@ -5998,7 +5804,7 @@ def main() -> int:
                                                                    (8 + curr_broken_tiles - min_broken_tiles),
                                                 legendary_creature_reward_exp=mpf("10") **
                                                                               (
-                                                                                          10 + curr_broken_tiles - min_broken_tiles))
+                                                                                      10 + curr_broken_tiles - min_broken_tiles))
                         new_game.player_data.claim_reward(reward)
                     else:
                         print("You lost! Better luck next time!")
@@ -6921,9 +6727,13 @@ def main() -> int:
                     print("Below is a list of legendary creatures you have.\n")
                     current_legendary_creature_index: int = 1  # initial value
                     for legendary_creature in new_game.player_data.legendary_creature_inventory.get_legendary_creatures():
-                        print("LEGENDARY CREATURE #" + str(current_legendary_creature_index))
-                        print(str(legendary_creature) + "\n")
-                        current_legendary_creature_index += 1
+                        if not legendary_creature.placed_in_habitat and \
+                                not legendary_creature.placed_in_training_area and \
+                                legendary_creature.legendary_creature_id not in [creature.id for creature in
+                                                        new_game.player_data.battle_team.get_legendary_creatures()]:
+                            print("LEGENDARY CREATURE #" + str(current_legendary_creature_index))
+                            print(str(legendary_creature) + "\n")
+                            current_legendary_creature_index += 1
 
                     print("Enter 'Y' for yes.")
                     print("Enter anything else for no.")
@@ -7415,81 +7225,6 @@ def main() -> int:
     # Saving game data and quitting the game.
     save_game_data(new_game, file_name)
     return 0
-
-
-# Creating additional functions for multiplayer game mode.
-
-
-def mp_main():
-    """
-    The following code for multiplayer battle is inspired by the YouTube video in the following source.
-    https://www.youtube.com/watch?v=2klJP0DEsJg
-    """
-    local_ip: str = socket.gethostbyname('localhost')
-    host: str = local_ip  # IP address of the host
-    port: int = 5555  # port number
-    game_socket: socket.socket = socket.socket()
-    game_socket.connect((host, port))
-    print("Waiting for other player to connect.")
-    global GameIG
-    player1_bytes: bytes = pickle.dumps(GameIG)
-    game_socket.send(player1_bytes)
-    player2_bytes: bytes = game_socket.recv(1024)
-    player2_game_data: Game = pickle.loads(player2_bytes)
-    while True:
-        mpinput = mp_format(GameIG.player_data.name, player2_game_data.player_data.name)
-        game_socket.send(mpinput.encode())
-        print("Waiting for other player to respond")
-        PlayerStatusBytes: bytes = game_socket.recv(1024)
-        PlayerStatus: list = pickle.loads(PlayerStatusBytes)
-        GameIG = PlayerStatus[0]
-        player2_game_data = PlayerStatus[1]
-        if PlayerStatus[2] != 0:
-            if PlayerStatus[2] == 1:
-                mp_win(GameIG.player_data.name, game_socket)
-
-                # The winner gains rewards in this game
-                enemy_battle_team: Team = player2_game_data.player_data.battle_team
-                reward: Reward = Reward(mpf("10") ** sum(legendary_creature.rating for legendary_creature
-                                                         in enemy_battle_team.get_legendary_creatures()),
-                                        mpf("10") ** (sum(legendary_creature.rating for legendary_creature
-                                                          in enemy_battle_team.get_legendary_creatures()) - 2),
-                                        mpf("10") ** (sum(legendary_creature.rating for legendary_creature
-                                                          in enemy_battle_team.get_legendary_creatures()) - 5),
-                                        mpf("10") ** sum(legendary_creature.rating for legendary_creature
-                                                         in enemy_battle_team.get_legendary_creatures()))
-                GameIG.player_data.claim_reward(reward)
-
-            elif PlayerStatus[2] == 2:
-                mp_lose(GameIG.player_data.name, game_socket)
-
-            # Saving game data and quitting the game.
-            save_game_data(GameIG,
-                           "SAVED LEGENDARY CREATURE CITY BUILDER GAME DATA - " +
-                           str(GameIG.player_data.name).upper())
-            sys.exit()
-
-
-def mp_format(player_name: str, opponent_name: str):
-    print("--------------------" + str(player_name) + " VS. " + str(opponent_name) + "--------------------")
-    print("Enter '1' to Attack")
-    mpinput: str = input("-> ")
-    if mpinput != "1":
-        mp_format(player_name, opponent_name)
-    else:
-        return mpinput
-
-
-def mp_win(opponent_name, game_socket):
-    # type: (str, socket.socket) -> None
-    print("You have defeated " + str(opponent_name))
-    game_socket.close()
-
-
-def mp_lose(opponent_name, game_socket):
-    # type: (str, socket.socket) -> None
-    print("You have lost to " + str(opponent_name))
-    game_socket.close()
 
 
 if __name__ == '__main__':
