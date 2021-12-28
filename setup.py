@@ -15,7 +15,7 @@ setup(
     license='MIT',
     author='NativeApkDev',
     author_email='nativeapkdev2021@gmail.com',
-    description='This package contains implementation of the online multiplayer strategy and social-network RPG '
+    description='This package contains implementation of the offline strategy RPG '
                 '"LEGENDARY_CREATURE_CITY_BUILDER" on command line interface.',
     long_description=readme(),
     long_description_content_type="text/markdown",
